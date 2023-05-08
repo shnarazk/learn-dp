@@ -41,6 +41,8 @@ mod tests {
         let f1: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x + 1.0));
         assert_eq!(f1.apply(v1.clone()).data, 3.0);
         let f2: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.exp()));
-        assert!((f2.apply(v1).data - 7.389056).abs() < 0.001);
+        assert!((f2.apply(v1.clone()).data - 7.389056).abs() < 0.001);
+        let f3: Function<f32> = f2.clone();
+        assert_eq!(f3.apply(v1.clone()).data, f2.apply(v1).data);
     }
 }
