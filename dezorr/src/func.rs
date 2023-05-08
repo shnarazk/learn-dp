@@ -28,6 +28,8 @@ mod tests {
         let v1: Variable<f32> = Variable::new(2.0f32);
         assert_eq!(v1.data, 2.0);
         let f1: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x + 1.0));
-        assert_eq!(f1.apply(v1).data, 3.0);
+        assert_eq!(f1.apply(v1.clone()).data, 3.0);
+        let f2: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.exp()));
+        assert!((f2.apply(v1).data - 7.389056).abs() < 0.001);
     }
 }
