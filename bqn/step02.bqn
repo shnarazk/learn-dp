@@ -7,7 +7,7 @@ NewVariable ⇐ {F init:
   Set ⇐ { F v: val ↩ v }
 }
 
-_asSimpleFunction ⇐ { w _s:
+_asSimpleFunction ← { w _s:
   test ⇐ 3
   Fn ⇐ W
   Set ⇐ { Fn ↩ 𝕏 }
@@ -15,10 +15,9 @@ _asSimpleFunction ⇐ { w _s:
 }
 
 _asFunction ⇐ { w _s:
-  test ⇐ 3
-  Fn ⇐ W
-  Set ⇐ { Fn ↩ 𝕏 }
-  Apply ⇐ { NewVariable Fn 𝕩.val }
+  Forward ⇐ W
+  Set ⇐ { Forward ↩ 𝕏 }
+  Apply ⇐ { NewVariable Forward 𝕩.val }
 }
 
 x ← NewVariable 1
@@ -31,3 +30,7 @@ G ← (1⊸+)_asFunction
 "g contains a function → g.Apply x" lib.Debug g.Apply x
 y ← g.Apply x
 "The return value contains answer"  lib.Debug y.val
+
+Square ← 2⊸(⋆˜)_asFunction
+x10 ← NewVariable 10
+"square.Apply x10" lib.Debug (square.Apply x10).Data @
