@@ -1,15 +1,26 @@
+use std::rc::Rc;
+
 use crate::var::Variable;
 
 pub struct Function<D> {
-    function: Box<dyn Fn(D) -> D>,
+    function: Rc<Box<dyn Fn(D) -> D>>,
 }
 
+impl<F> Clone for Function<F> {
+    fn clone(&self) -> Self {
+        Function {
+            function: self.function.clone(),
+        }
+    }
+}
 impl<D> Function<D> {
     pub fn new(function: Box<dyn Fn(D) -> D>) -> Self {
-        Function { function }
+        Function {
+            function: Rc::new(function),
+        }
     }
     pub fn apply(&self, v: Variable<D>) -> Variable<D> {
-        let f = &self.function;
+        let f = &*self.function;
         let n = f(v.data);
         Variable::new(n)
     }
