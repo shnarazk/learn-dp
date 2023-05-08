@@ -16,6 +16,6 @@ _asFunction ⇐ { w _s:
 
 x ← NewVariable 1
 F ← (1⊸+)_asFunction 
-"f is a namespace"                    lib.Debug f
-"f is a sort of function `f.Apply 3`" lib.Debug f.Apply 4
-"f has a secret store `f.test`"       lib.Debug f.test
+"F or f is a namespace"             lib.Debug f
+"f contains a function → f.Apply 3" lib.Debug f.Apply 3
+"f has a secret store → f.test"     lib.Debug f.test
