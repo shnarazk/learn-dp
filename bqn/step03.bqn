@@ -31,3 +31,5 @@ F ← Exp _followedBy_ Ln
 "Ln∘Exp x10"            lib.Debug (f.Apply x10).Data @
 G ← Square _followedBy_ Square
 "Square∘Square x10"     lib.Debug (g.Apply x10).Data @
+Chain ← Square _followedBy_ Exp _followedBy_ Square
+"A∘B∘C 0.5 should be 1.648"     lib.Debug (chain.Apply NewVariable 0.5).Data @
