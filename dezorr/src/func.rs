@@ -1,6 +1,4 @@
-use std::rc::Rc;
-
-use crate::var::Variable;
+use {crate::var::Variable, std::rc::Rc};
 
 pub struct Function<D> {
     function: Rc<Box<dyn Fn(D) -> D>>,
@@ -61,5 +59,14 @@ mod tests {
         assert!((g.apply(v1.clone()).data - std::f32::consts::E).abs() < 0.001);
         let fg_or_gf: Function<f32> = f.followed_by(&g);
         assert!((fg_or_gf.apply(v1).data - std::f32::consts::E.powi(2)).abs() < 0.001);
+    }
+    #[test]
+    fn test_step_3_2() {
+        let x: Variable<f32> = Variable::new(0.5f32);
+        let a: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
+        let b: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.exp()));
+        let c: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
+        let chain: Function<f32> = a.followed_by(&b).followed_by(&c);
+        assert!((chain.apply(x).data - 1.6487212).abs() < 0.001);
     }
 }
