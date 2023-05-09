@@ -34,3 +34,8 @@ y ← g.Apply x
 Square ← 2⊸(⋆˜)_asFunction
 x10 ← NewVariable 10
 "square.Apply x10" lib.Debug (square.Apply x10).Data @
+
+Exp ← ⋆_asFunction
+"Exp.Apply x"      lib.Debug (exp.Apply x).Data @
+Ln ← ⋆⁼_asFunction
+"Ln.Apply x10"     lib.Debug (ln.Apply x10).Data @
