@@ -16,9 +16,11 @@ _function_ ⇐ {
   Bck ⇐ 𝔾
   input ⇐ ¯∞
   Set ⇐ { S 𝕩: Fwd ↩ 𝕏; S⁼ x: Bck ↩ 𝕏 }
+  # `x f.Propagate⁼ y` is a shortcut of `x SetGrad f.Propagate⁼ y`
   Propagate ⇐ {
-    S  𝕩: input ↩ 𝕩, NewVariable Fwd 𝕩.Val @;
-    S⁼ 𝕩: (𝕩.Val⁼ @) × Bck input.Val @
+      S  𝕩: input ↩ 𝕩, NewVariable Fwd 𝕩.Val @;
+      S⁼ 𝕩: (𝕩.Val⁼ @) × Bck input.Val @;
+    v S⁼ 𝕩: v.Set⁼ (𝕩.Val⁼ @) × Bck input.Val @, v
   }
   NumericalDiff ⇐ {
       S x: 0.0001 S x;
@@ -63,5 +65,5 @@ FC ← 2⊸(⋆˜) _function_ (2⊸×)
 x ↩ NewVariable 0.5
 y ← fc.Propagate b ← fb.Propagate a ← fa.Propagate x
 y.Set⁼ 1.0
-x SetGrad fa.Propagate⁼ a SetGrad fb.Propagate⁼ b SetGrad fc.Propagate⁼ y
+x fa.Propagate⁼ a fb.Propagate⁼ b fc.Propagate⁼ y
 "back prop. C→B→A at 0.5" lib.Debug x.Val⁼ @
