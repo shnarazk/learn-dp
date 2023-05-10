@@ -1,20 +1,20 @@
 use {
-    crate::var::{Variable, VariableLike},
+    crate::var::{ContinuousDomain, Variable},
     std::rc::Rc,
 };
 
-pub struct Function<D: VariableLike> {
+pub struct Function<D: ContinuousDomain> {
     function: Rc<Box<dyn Fn(D) -> D>>,
 }
 
-impl<D: VariableLike> Clone for Function<D> {
+impl<D: ContinuousDomain> Clone for Function<D> {
     fn clone(&self) -> Self {
         Function {
             function: self.function.clone(),
         }
     }
 }
-impl<D: VariableLike> Function<D> {
+impl<D: ContinuousDomain> Function<D> {
     pub fn new(function: Box<dyn Fn(D) -> D>) -> Self {
         Function {
             function: Rc::new(function),

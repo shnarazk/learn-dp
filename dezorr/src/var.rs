@@ -1,9 +1,4 @@
-#[derive(Clone, Debug)]
-pub struct Variable<D: VariableLike> {
-    pub data: D,
-}
-
-pub trait VariableLike:
+pub trait ContinuousDomain:
     'static
     + Clone
     + std::ops::Add<Output = Self>
@@ -12,12 +7,17 @@ pub trait VariableLike:
 {
 }
 
-impl VariableLike for usize {}
-impl VariableLike for u32 {}
-impl VariableLike for f64 {}
-impl VariableLike for f32 {}
+impl ContinuousDomain for usize {}
+impl ContinuousDomain for u32 {}
+impl ContinuousDomain for f64 {}
+impl ContinuousDomain for f32 {}
 
-impl<D: VariableLike> Variable<D> {
+#[derive(Clone, Debug)]
+pub struct Variable<D: ContinuousDomain> {
+    pub data: D,
+}
+
+impl<D: ContinuousDomain> Variable<D> {
     pub fn new(data: D) -> Self {
         Variable { data }
     }
