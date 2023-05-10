@@ -13,11 +13,7 @@ _asFunction ⇐ { w _s:
   Apply ⇐ { NewVariable Forward 𝕩.val }
 }
 
-_followedBy_ ⇐ { w _s_ x:
-  Forward ⇐ x.Forward∘w.Forward
-  Set ⇐ { Forward ↩ 𝕏 }
-  Apply ⇐ { NewVariable Forward 𝕩.val }
-}
+_followedBy_ ⇐ { w _s_ x: (x.Forward∘w.Forward) _asFunction }
 
 x ← NewVariable 1
 Square ← 2⊸(⋆˜)_asFunction
