@@ -83,4 +83,13 @@ mod tests {
         let s: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
         assert!((s.numerical_diff(&x, &0.0001) - 4.0f32).abs() < 0.005);
     }
+    #[test]
+    fn test_step_4_3() {
+        let x: Variable<f32> = Variable::new(0.5f32);
+        let a: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
+        let b: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.exp()));
+        let c: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
+        let chain: Function<f32> = a.followed_by(&b).followed_by(&c);
+        assert!((chain.numerical_diff(&x, &0.0001) - 3.2974426).abs() < 0.001);
+    }
 }
