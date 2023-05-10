@@ -3,6 +3,7 @@ pub trait ContinuousDomain:
     + Clone
     + std::ops::Add<Output = Self>
     + std::ops::Sub<Output = Self>
+    + std::ops::Mul<Output = Self>
     + std::ops::Div<Output = Self>
 {
 }
@@ -21,6 +22,10 @@ pub struct Variable<D: ContinuousDomain> {
 impl<D: ContinuousDomain> Variable<D> {
     pub fn new(data: D) -> Self {
         Variable { data, grad: None }
+    }
+    pub fn set_grad(&mut self, g: D) -> &Self {
+        self.grad = Some(g.clone());
+        self
     }
 }
 
