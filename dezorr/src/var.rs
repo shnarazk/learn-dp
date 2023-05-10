@@ -1,9 +1,23 @@
 #[derive(Clone, Debug)]
-pub struct Variable<D> {
+pub struct Variable<D: VariableLike> {
     pub data: D,
 }
 
-impl<D> Variable<D> {
+pub trait VariableLike:
+    'static
+    + Clone
+    + std::ops::Add<Output = Self>
+    + std::ops::Sub<Output = Self>
+    + std::ops::Div<Output = Self>
+{
+}
+
+impl VariableLike for usize {}
+impl VariableLike for u32 {}
+impl VariableLike for f64 {}
+impl VariableLike for f32 {}
+
+impl<D: VariableLike> Variable<D> {
     pub fn new(data: D) -> Self {
         Variable { data }
     }

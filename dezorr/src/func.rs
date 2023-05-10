@@ -1,17 +1,20 @@
-use {crate::var::Variable, std::rc::Rc};
+use {
+    crate::var::{Variable, VariableLike},
+    std::rc::Rc,
+};
 
-pub struct Function<D> {
+pub struct Function<D: VariableLike> {
     function: Rc<Box<dyn Fn(D) -> D>>,
 }
 
-impl<F> Clone for Function<F> {
+impl<D: VariableLike> Clone for Function<D> {
     fn clone(&self) -> Self {
         Function {
             function: self.function.clone(),
         }
     }
 }
-impl<D: 'static> Function<D> {
+impl<D: VariableLike> Function<D> {
     pub fn new(function: Box<dyn Fn(D) -> D>) -> Self {
         Function {
             function: Rc::new(function),
@@ -27,6 +30,11 @@ impl<D: 'static> Function<D> {
         let f = self.function.clone();
         let g = other.function.clone();
         Function::<D>::new(Box::new(move |x: D| g(f(x))))
+    }
+    pub fn numerical_diff(&self, x: &Variable<D>, eps: &D) -> D {
+        let x0 = Variable::new(x.data.clone() - eps.clone());
+        let x1 = Variable::new(x.data.clone() + eps.clone());
+        (self.apply(x1).data - self.apply(x0).data) / (eps.clone() + eps.clone())
     }
 }
 
@@ -68,5 +76,11 @@ mod tests {
         let c: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
         let chain: Function<f32> = a.followed_by(&b).followed_by(&c);
         assert!((chain.apply(x).data - 1.6487212).abs() < 0.001);
+    }
+    #[test]
+    fn test_step_4_2() {
+        let x: Variable<f32> = Variable::new(2.0f32);
+        let s: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
+        assert!((s.numerical_diff(&x, &0.0001) - 4.0f32).abs() < 0.005);
     }
 }
