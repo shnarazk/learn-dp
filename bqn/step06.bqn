@@ -3,7 +3,7 @@ lib ← •Import "lib.bqn"
 
 # backward operations are mapped to `⁼`
 NewVariable ⇐ {
-  grad‿input ⇐ ¯∞‿𝕩
+  grad‿input ⇐ 1‿𝕩
   Val ⇐ { S n: input; S⁼ n: grad }
   Set ⇐ { S 𝕩: input ↩ 𝕩; S⁼ 𝕩: grad ↩ 𝕩 }
 }
@@ -64,6 +64,5 @@ FB ← ⋆_function_⋆
 FC ← 2⊸(⋆˜) _function_ (2⊸×)
 x ↩ NewVariable 0.5
 y ← fc.Propagate b ← fb.Propagate a ← fa.Propagate x
-y.Set⁼ 1.0
 x fa.Propagate⁼ a fb.Propagate⁼ b fc.Propagate⁼ y
 "back prop. C→B→A at 0.5" lib.Debug x.Val⁼ @
