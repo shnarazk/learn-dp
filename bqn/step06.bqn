@@ -8,28 +8,19 @@ NewVariable ⇐ {
   Set ⇐ { S 𝕩: input ↩ 𝕩; S⁼ 𝕩: grad ↩ 𝕩 }
 }
 
-_asFunction ⇐ { 𝔽 _function_ { F 𝕩: !𝕩≠𝕩 }  }
-
-# backward operations are mapped to `⁼`
 _function_ ⇐ {
-  Fwd ⇐ 𝔽
-  Bck ⇐ 𝔾
-  input ⇐ ¯∞
+  Fwd‿Bck‿input ⇐ 𝔽‿𝔾‿¯∞
   Set ⇐ { S 𝕩: Fwd ↩ 𝕏; S⁼ x: Bck ↩ 𝕏 }
-  # `x f.Propagate⁼ y` is a shortcut of `x SetGrad f.Propagate⁼ y`
   Propagate ⇐ {
       S  𝕩: input ↩ 𝕩, NewVariable Fwd 𝕩.Val @;
       S⁼ 𝕩: (𝕩.Val⁼ @) × Bck input.Val @;
     v S⁼ 𝕩: v.Set⁼ (𝕩.Val⁼ @) × Bck input.Val @, v
   }
-  NumericalDiff ⇐ {
-      S x: 0.0001 S x;
-    e S x: x.input (+((2×e)⊸(÷˜)∘-○Fwd)-) e
-  }
+  NumericalDiff ⇐ { Diff x: 0.0001 Diff x; e Diff x: x.input (+((2×e)⊸(÷˜)∘-○Fwd)-) e }
 }
 
+_asFunction ⇐ { 𝔽 _function_ { F 𝕩: !𝕩≠𝕩 }  }
 _followedBy_ ⇐ { 𝕘.Fwd∘𝕗.Fwd _asFunction }
-SetGrad ← { var F val: var.Set⁼ val, var }
 
 # some function examples
 Square ← 2⊸(⋆˜) _function_ (2⊸×)
@@ -42,11 +33,6 @@ G ← Square _followedBy_ Square
 Chain ← Square _followedBy_ Exp _followedBy_ Square
 
 x ← NewVariable 0
-"x 0" lib.Debug x.Val @
-x.Set 1
-"x.val 1" lib.Debug x.Val @
-x.Set⁼ 2
-"x.grad 2" lib.Debug x.Val⁼ @
 x10 ← NewVariable 10
 
 "Square x10"                 lib.Debug (square.Propagate x10).Val @
