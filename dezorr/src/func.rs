@@ -3,35 +3,54 @@ use {
     std::rc::Rc,
 };
 
+pub trait FunctionOn<D: ContinuousDomain> {
+    fn new(function: Box<dyn Fn(D) -> D>) -> Self;
+    fn apply(&self, v: Variable<D>) -> Variable<D>;
+    fn set_backward(self, function: Box<dyn Fn(D) -> D>) -> Self;
+    fn followed_by(&self, other: &Self) -> Self;
+    fn numerical_diff(&self, x: &Variable<D>, eps: &D) -> D;
+}
+
+#[allow(clippy::complexity)]
 pub struct Function<D: ContinuousDomain> {
-    function: Rc<Box<dyn Fn(D) -> D>>,
+    forward: Rc<Box<dyn Fn(D) -> D>>,
+    input: Option<D>,
+    backward: Option<Rc<Box<dyn Fn(D) -> D>>>,
 }
 
 impl<D: ContinuousDomain> Clone for Function<D> {
     fn clone(&self) -> Self {
         Function {
-            function: self.function.clone(),
+            forward: self.forward.clone(),
+            input: self.input.clone(),
+            backward: self.backward.clone(),
         }
     }
 }
-impl<D: ContinuousDomain> Function<D> {
-    pub fn new(function: Box<dyn Fn(D) -> D>) -> Self {
+impl<D: ContinuousDomain> FunctionOn<D> for Function<D> {
+    fn new(function: Box<dyn Fn(D) -> D>) -> Self {
         Function {
-            function: Rc::new(function),
+            forward: Rc::new(function),
+            input: None,
+            backward: None,
         }
     }
-    pub fn apply(&self, v: Variable<D>) -> Variable<D> {
-        let f = &*self.function;
+    fn apply(&self, v: Variable<D>) -> Variable<D> {
+        let f = &*self.forward;
         let n = f(v.data);
         Variable::new(n)
     }
+    fn set_backward(mut self, function: Box<dyn Fn(D) -> D>) -> Self {
+        self.backward = Some(Rc::new(function));
+        self
+    }
     /// step 3: function composition
-    pub fn followed_by(&self, other: &Self) -> Self {
-        let f = self.function.clone();
-        let g = other.function.clone();
+    fn followed_by(&self, other: &Self) -> Self {
+        let f = self.forward.clone();
+        let g = other.forward.clone();
         Function::<D>::new(Box::new(move |x: D| g(f(x))))
     }
-    pub fn numerical_diff(&self, x: &Variable<D>, eps: &D) -> D {
+    fn numerical_diff(&self, x: &Variable<D>, eps: &D) -> D {
         let x0 = Variable::new(x.data.clone() - eps.clone());
         let x1 = Variable::new(x.data.clone() + eps.clone());
         (self.apply(x1).data - self.apply(x0).data) / (eps.clone() + eps.clone())

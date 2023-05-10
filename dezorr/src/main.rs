@@ -1,4 +1,7 @@
-use dezorr::{func::Function, var::Variable};
+use dezorr::{
+    func::{Function, FunctionOn},
+    var::Variable,
+};
 
 fn main() {
     let v: Variable<usize> = Variable::new(0usize);

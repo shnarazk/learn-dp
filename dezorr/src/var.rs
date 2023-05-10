@@ -15,11 +15,12 @@ impl ContinuousDomain for f32 {}
 #[derive(Clone, Debug)]
 pub struct Variable<D: ContinuousDomain> {
     pub data: D,
+    pub grad: Option<D>,
 }
 
 impl<D: ContinuousDomain> Variable<D> {
     pub fn new(data: D) -> Self {
-        Variable { data }
+        Variable { data, grad: None }
     }
 }
 
