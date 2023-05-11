@@ -13,7 +13,7 @@ impl ContinuousDomain for u32 {}
 impl ContinuousDomain for f64 {}
 impl ContinuousDomain for f32 {}
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Variable<D: ContinuousDomain> {
     pub data: D,
     pub grad: Option<D>,
@@ -24,7 +24,7 @@ impl<D: ContinuousDomain> Variable<D> {
         Variable { data, grad: None }
     }
     pub fn set_grad(&mut self, g: D) -> &Self {
-        self.grad = Some(g.clone());
+        self.grad = Some(g);
         self
     }
 }

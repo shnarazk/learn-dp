@@ -3,34 +3,42 @@ use {
     std::rc::Rc,
 };
 
-pub trait FunctionOn<D: ContinuousDomain> {
+// pub struct FuctionLayer<D: ContinuousDomain> {
+//     pub function: HashMap<String, Function<D>>,
+// }
+
+pub trait FunctionOn<'a, D: ContinuousDomain> {
     fn new(function: Box<dyn Fn(D) -> D>) -> Self;
     fn apply(&mut self, v: &Variable<D>) -> Variable<D>;
     fn back_propagate(&self, v: Variable<D>) -> D;
+    fn bind(&'a mut self, seed: &'a Self);
     fn set_backward(self, function: Box<dyn Fn(D) -> D>) -> Self;
     fn followed_by(&self, other: &Self) -> Self;
     fn numerical_diff(&mut self, x: &Variable<D>, eps: &D) -> D;
 }
 
 #[allow(clippy::complexity)]
-pub struct Function<D: ContinuousDomain> {
+pub struct Function<'a, D: ContinuousDomain> {
+    seed: Option<&'a Function<'a, D>>,
     forward: Rc<Box<dyn Fn(D) -> D>>,
     input: Option<D>,
     backward: Option<Rc<Box<dyn Fn(D) -> D>>>,
 }
 
-impl<D: ContinuousDomain> Clone for Function<D> {
+impl<D: ContinuousDomain> Clone for Function<'_, D> {
     fn clone(&self) -> Self {
         Function {
+            seed: None,
             forward: self.forward.clone(),
             input: self.input.clone(),
             backward: self.backward.clone(),
         }
     }
 }
-impl<D: ContinuousDomain> FunctionOn<D> for Function<D> {
+impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
     fn new(function: Box<dyn Fn(D) -> D>) -> Self {
         Function {
+            seed: None,
             forward: Rc::new(function),
             input: None,
             backward: None,
@@ -41,6 +49,9 @@ impl<D: ContinuousDomain> FunctionOn<D> for Function<D> {
         self.input = Some(v.data.clone());
         let p = f(v.data.clone());
         Variable::new(p)
+    }
+    fn bind(&'a mut self, seed: &'a Self) {
+        self.seed = Some(seed);
     }
     fn back_propagate(&self, v: Variable<D>) -> D {
         let Some(b) = &self.backward else { panic!(); };
@@ -65,16 +76,17 @@ impl<D: ContinuousDomain> FunctionOn<D> for Function<D> {
     }
 }
 
-pub fn function_square<D: ContinuousDomain>() -> Function<D> {
-    Function::<D>::new(Box::new(|x: D| x.clone() * x)).set_backward(Box::new(|x| x.clone() + x))
+pub fn function_square<D: ContinuousDomain>() -> Function<'static, D> {
+    Function::<'static, D>::new(Box::new(|x: D| x.clone() * x))
+        .set_backward(Box::new(|x| x.clone() + x))
 }
 
-pub fn function_exp_f32() -> Function<f32> {
-    Function::<f32>::new(Box::new(|x: f32| x.exp())).set_backward(Box::new(|x| x.exp()))
+pub fn function_exp_f32() -> Function<'static, f32> {
+    Function::<'static, f32>::new(Box::new(|x: f32| x.exp())).set_backward(Box::new(|x| x.exp()))
 }
 
-pub fn function_exp_f64() -> Function<f64> {
-    Function::<f64>::new(Box::new(|x: f64| x.exp())).set_backward(Box::new(|x| x.exp()))
+pub fn function_exp_f64() -> Function<'static, f64> {
+    Function::<'static, f64>::new(Box::new(|x: f64| x.exp())).set_backward(Box::new(|x| x.exp()))
 }
 
 #[cfg(test)]
