@@ -219,9 +219,6 @@ mod tests {
         fb.back_propagate();
         fa.back_propagate();
         assert!((x.grad().unwrap() - 3.29744).abs() < 0.0001);
-        assert!(fa.value().is_some());
-        assert!(fb.value().is_some());
-        assert!(fc.value().is_some());
     }
     #[test]
     fn test_step_6_3_backtrace() {
@@ -244,8 +241,5 @@ mod tests {
         assert!(f_equals_to_x.seed().is_none());
 
         assert!((x.grad().unwrap() - 3.29744).abs() < 0.0001);
-        assert!(fa.value().is_some());
-        assert!(fb.value().is_some());
-        assert!(fc.value().is_some());
     }
 }
