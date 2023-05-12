@@ -6,9 +6,9 @@ use {
 pub trait FunctionOn<'a, D: ContinuousDomain + Default> {
     fn new(function: Box<dyn Fn(D) -> D>) -> Self;
     fn constant(value: D) -> Self;
-    fn propagate_to(&'a self, v: &'a Self);
-    fn propagate(&'a self, v: &'a Self);
-    fn back_propagate(&self) -> D;
+    fn propagate_value_to(&'a self, v: &'a Self);
+    fn propagate_grad(&self) -> D;
+    fn propagate_backward(&'a self, base: D);
     fn set_backward(self, function: Box<dyn Fn(D) -> D>) -> Self;
     fn followed_by(&self, other: &Self) -> Self;
     fn numerical_diff(&'a mut self, x: &'a Variable<D>, eps: &D) -> D;
@@ -57,18 +57,15 @@ impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
             output: Variable::new(value),
         }))
     }
-    fn propagate_to(&'a self, seed: &'a Self) {
-        seed.propagate(self)
-    }
-    fn propagate(&'a self, seed: &'a Self) {
-        let mut binding = self.0.borrow_mut();
-        let f = &binding.forward;
-        let Some(input) = &seed.0.borrow().output.data else { panic!(); };
+    fn propagate_value_to(&'a self, target: &'a Self) {
+        let mut target_binding = target.0.borrow_mut();
+        let f = &target_binding.forward;
+        let Some(input) = &self.0.borrow().output.data else { panic!(); };
         let p = f(input.clone());
-        binding.seed = Some(seed);
-        binding.output.data = Some(p);
+        target_binding.seed = Some(self);
+        target_binding.output.data = Some(p);
     }
-    fn back_propagate(&self) -> D {
+    fn propagate_grad(&self) -> D {
         let my_binding = self.0.borrow_mut();
         let my_output = &my_binding.output;
         let Some(factor) = my_output.grad.as_ref() else { panic!(); };
@@ -82,6 +79,15 @@ impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
         seed_binding.output.grad = Some(g.clone());
         g
     }
+    fn propagate_backward(&'a self, base: D) {
+        self.set_grad(base);
+        let mut f = self;
+        while f.seed().is_some() {
+            f.propagate_grad();
+            f = f.seed().unwrap();
+        }
+    }
+
     fn set_backward(self, function: Box<dyn Fn(D) -> D>) -> Self {
         self.0.borrow_mut().backward = Some(Rc::new(function));
         self
@@ -143,38 +149,37 @@ mod tests {
         let c0: Function<usize> = Function::constant(0usize);
         assert_eq!(c0.0.borrow().output.data, Some(0));
         let f0: Function<usize> = Function::<usize>::new(Box::new(|x: usize| x + 1));
-        f0.propagate(&c0);
+        c0.propagate_value_to(&f0);
         assert_eq!(f0.0.borrow().output.data, Some(1));
 
         let _v1: Variable<f32> = Variable::new(2.0f32);
         let c1: Function<f64> = Function::constant(2.0f64);
         assert_eq!(c1.value(), Some(2.0));
         let f1: Function<f64> = Function::<f64>::new(Box::new(|x: f64| x + 1.0));
-        f1.propagate(&c1);
+        c1.propagate_value_to(&f1);
         assert_eq!(f1.value(), Some(3.0));
         let f2: Function<f64> = Function::<f64>::new(Box::new(|x: f64| x.exp()));
-        f2.propagate(&c1);
+        c1.propagate_value_to(&f2);
         assert!((f2.value().unwrap() - 7.389056).abs() < 0.001);
         let f3: Function<f64> = f2.clone();
-        f3.propagate(&c1);
+        c1.propagate_value_to(&f3);
         assert_eq!(f3.value(), f2.value());
     }
     #[test]
     fn test_step_3() {
-        let _v1: Variable<f32> = Variable::new(1.0f32);
         let c1: Function<f64> = Function::constant(1.0f64);
         assert_eq!(c1.value(), Some(1.0));
         let f: Function<f64> = Function::<f64>::new(Box::new(|x: f64| x + 1.0));
-        f.propagate(&c1);
+        c1.propagate_value_to(&f);
         assert_eq!(f.value(), Some(2.0));
         let c1: Function<f64> = Function::constant(1.0f64);
         let g: Function<f64> = Function::<f64>::new(Box::new(|x: f64| x.exp()));
-        g.propagate(&c1);
+        c1.propagate_value_to(&g);
         assert!((g.value().unwrap() - std::f64::consts::E).abs() < 0.001);
         let c1: Function<f64> = Function::constant(1.0f64);
-        let fg_or_gf: Function<f64> = f.followed_by(&g);
-        fg_or_gf.propagate(&c1);
-        assert!((fg_or_gf.value().unwrap() - std::f64::consts::E.powi(2)).abs() < 0.001);
+        let fg: Function<f64> = f.followed_by(&g);
+        c1.propagate_value_to(&fg);
+        assert!((fg.value().unwrap() - std::f64::consts::E.powi(2)).abs() < 0.001);
     }
     #[test]
     fn test_step_3_2() {
@@ -183,7 +188,7 @@ mod tests {
         let b: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.exp()));
         let c: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
         let chain: Function<f32> = a.followed_by(&b).followed_by(&c);
-        x.propagate_to(&chain);
+        x.propagate_value_to(&chain);
         assert!((chain.value().unwrap() - 1.6487212).abs() < 0.001);
     }
     #[test]
@@ -207,39 +212,32 @@ mod tests {
         let fa = function_square(&x);
         let fb = function_exp_f64(&x);
         let fc = function_square::<f64>(&x);
-        x.propagate_to(&fa);
+        x.propagate_value_to(&fa);
         assert_eq!(x.value(), fa.input());
-        fa.propagate_to(&fb);
+        fa.propagate_value_to(&fb);
         assert_eq!(fa.value(), fb.input());
-        fb.propagate_to(&fc);
+        fb.propagate_value_to(&fc);
         assert_eq!(fb.value(), fc.input());
         assert!((fc.value().unwrap() - 1.6487212).abs() < 0.001);
         fc.set_grad(1.0);
-        fc.back_propagate();
-        fb.back_propagate();
-        fa.back_propagate();
+        fc.propagate_grad();
+        fb.propagate_grad();
+        fa.propagate_grad();
         assert!((x.grad().unwrap() - 3.29744).abs() < 0.0001);
     }
     #[test]
-    fn test_step_6_3_backtrace() {
-        let x = Function::constant(0.5f64);
-        let fa = function_square(&x);
-        let fb = function_exp_f64(&x);
-        let fc = function_square::<f64>(&x);
+    fn test_step_7_3() {
+        let x0 = Function::constant(0.5f64);
+        let fa = function_square(&x0);
+        let fb = function_exp_f64(&x0);
+        let fc = function_square::<f64>(&x0);
 
-        x.propagate_to(&fa);
-        fa.propagate_to(&fb);
-        fb.propagate_to(&fc);
+        x0.propagate_value_to(&fa);
+        fa.propagate_value_to(&fb);
+        fb.propagate_value_to(&fc);
 
-        fc.set_grad(1.0);
-        fc.back_propagate();
-        let Some(f_equals_to_fb) = fc.seed() else { panic!(); };
-        f_equals_to_fb.back_propagate();
-        let Some(f_equals_to_fa) = f_equals_to_fb.seed() else { panic!(); };
-        f_equals_to_fa.back_propagate();
-        let Some(f_equals_to_x) = f_equals_to_fa.seed() else { panic!(); };
-        assert!(f_equals_to_x.seed().is_none());
+        fc.propagate_backward(1.0);
 
-        assert!((x.grad().unwrap() - 3.29744).abs() < 0.0001);
+        assert!((x0.grad().unwrap() - 3.2974425).abs() < 0.00001);
     }
 }

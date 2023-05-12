@@ -1,11 +1,9 @@
-use dezorr::{
-    func::{Function, FunctionOn},
-    var::Variable,
-};
+use dezorr::func::{Function, FunctionOn};
 
 fn main() {
-    let v: Variable<usize> = Variable::new(0usize);
-    println!("Hello, {:?}!", v.data);
-    // let mut f: Function<usize> = Function::<usize>::new(Box::new(|x: usize| x + 1));
-    // println!("apply => {}", f.apply(&v).data)
+    let v: Function<usize> = Function::constant(0usize);
+    println!("Hello, {:?}!", v.value().unwrap());
+    let f: Function<usize> = Function::<usize>::new(Box::new(|x: usize| x + 1));
+    v.propagate_value_to(&f);
+    println!("apply => {}", f.value().unwrap());
 }
