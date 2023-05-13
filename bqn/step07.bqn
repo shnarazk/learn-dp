@@ -3,7 +3,7 @@ lib ← •Import "lib.bqn"
 
 # backward operations are mapped to `⁼`
 NewVariable ⇐ {
-    F 𝕩: ¯∞ F 𝕩;
+    F 𝕩: ∞ F 𝕩;
   c F 𝕩:
     grad‿input‿creator ⇐ 1‿𝕩‿c
     Val ⇐ { S n: input; S⁼ n: grad }
@@ -12,12 +12,22 @@ NewVariable ⇐ {
 
 _functionBuilder_ ⇐ {
   Self ⇐ { self ↩ 𝕩 }
-  Fwd‿Bck‿input ⇐ 𝔽‿𝔾‿¯∞
+  Fwd‿Bck‿input‿output ⇐ 𝔽‿𝔾‿¯∞‿∞
   Set ⇐ { S 𝕩: Fwd ↩ 𝕏; S⁼ x: Bck ↩ 𝕏 }
   Propagate ⇐ {
-      S  𝕩: input ↩ 𝕩, NewVariable Fwd 𝕩.Val @;
+      S  𝕩: input ↩ 𝕩, output ↩ self NewVariable Fwd 𝕩.Val @;
       S⁼ 𝕩: (𝕩.Val⁼ @) × Bck input.Val @;
     v S⁼ 𝕩: v.Set⁼ (𝕩.Val⁼ @) × Bck input.Val @, v
+  }
+  BackPropagate ⇐ {
+      Rec 𝕩: input.creator Rec self;
+    ∞ Rec f:
+      f.input f.Propagate⁼ f.output
+      f.input.grad;
+    c Rec f:
+      c.output f.Propagate⁼ f.output
+      ! c.output.grad=f.input.grad
+      c.input.creator Rec c
   }
   NumericalDiff ⇐ { Diff x: 0.0001 Diff x; e Diff x: x.input (+((2×e)⊸(÷˜)∘-○Fwd)-) e }
 }
@@ -55,4 +65,12 @@ x ↩ NewVariable 0.5
 y ← fc.Propagate b ← fb.Propagate a ← fa.Propagate x
 x fa.Propagate⁼ a fb.Propagate⁼ b fc.Propagate⁼ y
 "(Step06)back prop. C→B→A at 0.5"    lib.Debug x.Val⁼ @
+## step 7
 "(Step07)Each function has self"     lib.Debug square=square.self
+F07A ← 2⊸(⋆˜) _function_ (2⊸×)
+F07B ← ⋆_function_⋆
+F07C ← 2⊸(⋆˜) _function_ (2⊸×)
+x07 ← NewVariable 0.5
+y07 ← f07C.Propagate b07 ← f07B.Propagate a07 ← f07A.Propagate x07
+f07c.BackPropagate @
+"(Step07)auto back prop chain"       lib.Debug x07.Val⁼ @
