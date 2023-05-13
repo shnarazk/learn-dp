@@ -34,7 +34,7 @@ _functionBuilder_ ⇐ {
       f.input f.Propagate⁼ f.output
       f.input.grad;
     c Rec f:
-      c.output f.Propagate⁼ f.output
+      f.input f.Propagate⁼ f.output
       ! c.output.grad=f.input.grad
       c.input.creator Rec c
   }
