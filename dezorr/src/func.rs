@@ -1,26 +1,14 @@
 #![allow(dead_code)]
 
 use {
-    crate::var::ContinuousDomain,
-    std::{cell::RefCell, rc::Rc},
+    crate::{
+        arrow::{Arrow, Connection},
+        types::ContinuousDomain,
+    },
+    std::cell::RefCell,
 };
 
-#[derive(Clone)]
-struct ConnectionBody<'a, D: ContinuousDomain + Default> {
-    value: D,
-    source: &'a Function<'a, D>,
-}
-
-#[derive(Clone)]
-pub struct Connection<'a, D: ContinuousDomain + Default>(RefCell<ConnectionBody<'a, D>>);
-
-impl<'a, D: ContinuousDomain + Default> Connection<'a, D> {
-    fn new(value: D, source: &'a Function<'a, D>) -> Self {
-        Connection(RefCell::new(ConnectionBody { value, source }))
-    }
-}
-
-pub trait FunctionOn<'a, D: ContinuousDomain + Default> {
+pub trait FunctionOn<'a, D: ContinuousDomain> {
     fn new(arrow: Option<Box<dyn Fn(D) -> D>>, coarrow: Option<Box<dyn Fn(D) -> D>>) -> Self;
     fn coterminal(value: Vec<D>) -> Self;
     fn is_coterminal(&'a self) -> bool;
@@ -41,78 +29,14 @@ pub trait FunctionOn<'a, D: ContinuousDomain + Default> {
 
 #[allow(clippy::complexity)]
 #[derive(Default)]
-pub struct Arrow<'a, D: ContinuousDomain + Default> {
-    domain: Vec<Connection<'a, D>>,
-    arrow: Option<Rc<Box<dyn Fn(D) -> D>>>,
-    values: Vec<D>,
-    codomain: Vec<Connection<'a, D>>,
-}
-
-impl<D: ContinuousDomain + Default> Clone for Arrow<'_, D> {
-    fn clone(&self) -> Self {
-        Arrow {
-            domain: Vec::new(),
-            arrow: self.arrow.clone(),
-            values: self.values.clone(),
-            codomain: Vec::new(),
-        }
-    }
-}
-
-impl<'a, D: ContinuousDomain + Default> Arrow<'a, D> {
-    fn new(function: Option<Box<dyn Fn(D) -> D>>) -> Self {
-        Arrow {
-            arrow: function.map(Rc::new),
-            ..Arrow::default()
-        }
-    }
-    fn coterminal(values: Vec<D>) -> Self {
-        Arrow {
-            values,
-            ..Arrow::default()
-        }
-    }
-    fn is_terminal(&self) -> bool {
-        self.arrow.is_none() && self.codomain.is_empty()
-    }
-    fn is_coterminal(&self) -> bool {
-        self.arrow.is_none() && self.domain.is_empty() && !self.values.is_empty()
-    }
-    fn inputs(&'a self) -> Vec<D> {
-        self.domain
-            .iter()
-            .map(|l| l.0.borrow().value.clone())
-            .collect::<Vec<_>>()
-    }
-    fn outputs(&'a self) -> &[D] {
-        &self.values
-    }
-    fn apply(&mut self) {
-        if let Some(f) = &self.arrow {
-            self.values = self
-                .domain
-                .iter()
-                .map(|c| f(c.0.borrow().value.clone()))
-                .collect::<Vec<_>>();
-        }
-    }
-    fn propagate(&self) {
-        for (i, v) in self.values.iter().enumerate() {
-            self.codomain[i].0.borrow_mut().value = v.clone();
-        }
-    }
-}
-
-#[allow(clippy::complexity)]
-#[derive(Default)]
-pub struct FunctionBody<'a, D: ContinuousDomain + Default> {
+pub struct FunctionBody<'a, D: ContinuousDomain> {
     f: Arrow<'a, D>,
     b: Arrow<'a, D>,
 }
 
-pub struct Function<'a, D: ContinuousDomain + Default>(RefCell<FunctionBody<'a, D>>);
+pub struct Function<'a, D: ContinuousDomain>(RefCell<FunctionBody<'a, D>>);
 
-impl<D: ContinuousDomain + Default> Clone for Function<'_, D> {
+impl<D: ContinuousDomain> Clone for Function<'_, D> {
     fn clone(&self) -> Self {
         Function(RefCell::new(FunctionBody {
             f: self.0.borrow().f.clone(),
@@ -121,7 +45,7 @@ impl<D: ContinuousDomain + Default> Clone for Function<'_, D> {
     }
 }
 
-impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
+impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
     fn new(arrow: Option<Box<dyn Fn(D) -> D>>, coarrow: Option<Box<dyn Fn(D) -> D>>) -> Self {
         Function(RefCell::new(FunctionBody {
             f: Arrow::new(arrow),
@@ -249,7 +173,7 @@ impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
     */
 }
 /*
-pub fn function_square<'a, D: ContinuousDomain + Default>(
+pub fn function_square<'a, D: ContinuousDomain>(
     _lifetime_designator: &'a Function<'a, D>,
 ) -> Function<'a, D> {
     Function::<'a, D>::new(Box::new(|x: D| x.clone() * x)).set_backward(Box::new(|x| x.clone() + x))

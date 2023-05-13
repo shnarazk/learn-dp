@@ -1,25 +1,12 @@
-pub trait ContinuousDomain:
-    'static
-    + Clone
-    + std::ops::Add<Output = Self>
-    + std::ops::Sub<Output = Self>
-    + std::ops::Mul<Output = Self>
-    + std::ops::Div<Output = Self>
-{
-}
-
-impl ContinuousDomain for usize {}
-impl ContinuousDomain for u32 {}
-impl ContinuousDomain for f64 {}
-impl ContinuousDomain for f32 {}
+use crate::types::ContinuousDomain;
 
 #[derive(Clone, Default)]
-pub struct Variable<D: ContinuousDomain + Default> {
+pub struct Variable<D: ContinuousDomain> {
     pub val: D,
     pub grad: D,
 }
 
-impl<D: ContinuousDomain + Default> Variable<D> {
+impl<D: ContinuousDomain> Variable<D> {
     pub fn new(val: D) -> Self {
         Variable {
             val,
