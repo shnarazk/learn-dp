@@ -6,6 +6,7 @@ use {
 pub trait FunctionOn<'a, D: ContinuousDomain + Default> {
     fn new(function: Box<dyn Fn(D) -> D>) -> Self;
     fn constant(value: D) -> Self;
+    fn is_constant(&'a self) -> bool;
     fn propagate_value_to(&'a self, v: &'a Self);
     fn propagate_grad(&self) -> D;
     fn propagate_backward(&'a self, base: D);
@@ -57,6 +58,9 @@ impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
             output: Variable::new(value),
         }))
     }
+    fn is_constant(&'a self) -> bool {
+        self.seed().is_none()
+    }
     fn propagate_value_to(&'a self, target: &'a Self) {
         let mut target_binding = target.0.borrow_mut();
         let f = &target_binding.forward;
@@ -81,10 +85,13 @@ impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
     }
     fn propagate_backward(&'a self, base: D) {
         self.set_grad(base);
-        let mut f = self;
-        while f.seed().is_some() {
-            f.propagate_grad();
-            f = f.seed().unwrap();
+        let mut stack = vec![self];
+        while let Some(f) = stack.pop() {
+            if !f.is_constant() {
+                f.propagate_grad();
+                let Some(s) = f.seed() else { panic!(); };
+                stack.push(s);
+            }
         }
     }
 
@@ -239,5 +246,9 @@ mod tests {
         fc.propagate_backward(1.0);
 
         assert!((x0.grad().unwrap() - 3.2974425).abs() < 0.00001);
+    }
+    #[test]
+    fn test_step_8_3() {
+        test_step_7_3();
     }
 }
