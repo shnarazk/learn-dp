@@ -1,31 +1,113 @@
+#![allow(dead_code)]
+
 use {
-    crate::var::{ContinuousDomain, Variable},
+    crate::var::ContinuousDomain,
     std::{cell::RefCell, rc::Rc},
 };
 
+#[derive(Clone)]
+struct ConnectionBody<'a, D: ContinuousDomain + Default> {
+    value: D,
+    source: &'a Function<'a, D>,
+}
+
+#[derive(Clone)]
+pub struct Connection<'a, D: ContinuousDomain + Default>(RefCell<ConnectionBody<'a, D>>);
+
+impl<'a, D: ContinuousDomain + Default> Connection<'a, D> {
+    fn new(value: D, source: &'a Function<'a, D>) -> Self {
+        Connection(RefCell::new(ConnectionBody { value, source }))
+    }
+}
+
 pub trait FunctionOn<'a, D: ContinuousDomain + Default> {
-    fn new(function: Box<dyn Fn(D) -> D>) -> Self;
-    fn constant(value: D) -> Self;
-    fn is_constant(&'a self) -> bool;
-    fn propagate_value_to(&'a self, v: &'a Self);
-    fn propagate_grad(&self) -> D;
-    fn propagate_backward(&'a self, base: D);
-    fn set_backward(self, function: Box<dyn Fn(D) -> D>) -> Self;
-    fn followed_by(&self, other: &Self) -> Self;
-    fn numerical_diff(&'a mut self, x: &'a Variable<D>, eps: &D) -> D;
-    fn seed(&'a self) -> Option<&'a Function<D>>;
-    fn input(&self) -> Option<D>;
-    fn value(&self) -> Option<D>;
-    fn grad(&self) -> Option<D>;
-    fn set_grad(&self, val: D);
+    fn new(arrow: Option<Box<dyn Fn(D) -> D>>, coarrow: Option<Box<dyn Fn(D) -> D>>) -> Self;
+    fn coterminal(value: Vec<D>) -> Self;
+    fn is_coterminal(&'a self) -> bool;
+    fn apply_f(&self);
+    fn apply_b(&self);
+    fn propagate_f(&self);
+    fn propagate_b(&self);
+    fn link_to(&'a self, other: &'a Self);
+    // fn propagate_from(&'a self, v: &[&'a Self]);
+    // fn propagate_backward(&'a self, base: D);
+    // fn set_backward(self, function: Box<dyn Fn(D) -> D>) -> Self;
+    // fn followed_by(&self, other: &Self) -> Self;
+    // fn numerical_diff(&'a mut self, x: &'a Variable<D>, eps: &D) -> D;
+    // fn inputs(&'a self) -> Iter<'a, &'a D>;
+    // fn outputs(&self) -> Iter<&'a D>;
+    // fn set_grad(&self, val: D);
 }
 
 #[allow(clippy::complexity)]
+#[derive(Default)]
+pub struct Arrow<'a, D: ContinuousDomain + Default> {
+    domain: Vec<Connection<'a, D>>,
+    arrow: Option<Rc<Box<dyn Fn(D) -> D>>>,
+    values: Vec<D>,
+    codomain: Vec<Connection<'a, D>>,
+}
+
+impl<D: ContinuousDomain + Default> Clone for Arrow<'_, D> {
+    fn clone(&self) -> Self {
+        Arrow {
+            domain: Vec::new(),
+            arrow: self.arrow.clone(),
+            values: self.values.clone(),
+            codomain: Vec::new(),
+        }
+    }
+}
+
+impl<'a, D: ContinuousDomain + Default> Arrow<'a, D> {
+    fn new(function: Option<Box<dyn Fn(D) -> D>>) -> Self {
+        Arrow {
+            arrow: function.map(Rc::new),
+            ..Arrow::default()
+        }
+    }
+    fn coterminal(values: Vec<D>) -> Self {
+        Arrow {
+            values,
+            ..Arrow::default()
+        }
+    }
+    fn is_terminal(&self) -> bool {
+        self.arrow.is_none() && self.codomain.is_empty()
+    }
+    fn is_coterminal(&self) -> bool {
+        self.arrow.is_none() && self.domain.is_empty() && !self.values.is_empty()
+    }
+    fn inputs(&'a self) -> Vec<D> {
+        self.domain
+            .iter()
+            .map(|l| l.0.borrow().value.clone())
+            .collect::<Vec<_>>()
+    }
+    fn outputs(&'a self) -> &[D] {
+        &self.values
+    }
+    fn apply(&mut self) {
+        if let Some(f) = &self.arrow {
+            self.values = self
+                .domain
+                .iter()
+                .map(|c| f(c.0.borrow().value.clone()))
+                .collect::<Vec<_>>();
+        }
+    }
+    fn propagate(&self) {
+        for (i, v) in self.values.iter().enumerate() {
+            self.codomain[i].0.borrow_mut().value = v.clone();
+        }
+    }
+}
+
+#[allow(clippy::complexity)]
+#[derive(Default)]
 pub struct FunctionBody<'a, D: ContinuousDomain + Default> {
-    seed: Option<&'a Function<'a, D>>,
-    forward: Rc<Box<dyn Fn(D) -> D>>,
-    backward: Option<Rc<Box<dyn Fn(D) -> D>>>,
-    output: Variable<D>,
+    f: Arrow<'a, D>,
+    b: Arrow<'a, D>,
 }
 
 pub struct Function<'a, D: ContinuousDomain + Default>(RefCell<FunctionBody<'a, D>>);
@@ -33,41 +115,89 @@ pub struct Function<'a, D: ContinuousDomain + Default>(RefCell<FunctionBody<'a, 
 impl<D: ContinuousDomain + Default> Clone for Function<'_, D> {
     fn clone(&self) -> Self {
         Function(RefCell::new(FunctionBody {
-            seed: None,
-            forward: self.0.borrow().forward.clone(),
-            backward: self.0.borrow().backward.clone(),
-            output: Variable::default(),
+            f: self.0.borrow().f.clone(),
+            b: self.0.borrow().b.clone(),
         }))
     }
 }
 
 impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
-    fn new(function: Box<dyn Fn(D) -> D>) -> Self {
+    fn new(arrow: Option<Box<dyn Fn(D) -> D>>, coarrow: Option<Box<dyn Fn(D) -> D>>) -> Self {
         Function(RefCell::new(FunctionBody {
-            seed: None,
-            forward: Rc::new(function),
-            backward: None,
-            output: Variable::default(),
+            f: Arrow::new(arrow),
+            b: Arrow::new(coarrow),
         }))
     }
-    fn constant(value: D) -> Self {
+    fn coterminal(values: Vec<D>) -> Self {
         Function(RefCell::new(FunctionBody {
-            seed: None,
-            forward: Rc::new(Box::new(|x: D| x)),
-            backward: None,
-            output: Variable::new(value),
+            f: Arrow::coterminal(values),
+            b: Arrow::default(),
         }))
     }
-    fn is_constant(&'a self) -> bool {
-        self.seed().is_none()
+    // fn inputs(&self) -> Iter<&D> {
+    //     self.0.borrow().f.domain.iter().map(|l| &l.value)
+    // }
+    // fn outputs(&self) -> Iter<&D> {
+    //     self.0.borrow().f.values.iter()
+    // }
+    fn is_coterminal(&self) -> bool {
+        let binding = self.0.borrow();
+        let f = &binding.f;
+        f.is_coterminal()
     }
-    fn propagate_value_to(&'a self, target: &'a Self) {
-        let mut target_binding = target.0.borrow_mut();
-        let f = &target_binding.forward;
-        let Some(input) = &self.0.borrow().output.data else { panic!(); };
-        let p = f(input.clone());
-        target_binding.seed = Some(self);
-        target_binding.output.data = Some(p);
+    fn apply_f(&self) {
+        self.0.borrow_mut().f.apply();
+    }
+    fn apply_b(&self) {
+        self.0.borrow_mut().b.apply();
+    }
+    fn propagate_f(&self) {
+        self.0.borrow_mut().f.propagate();
+    }
+    fn propagate_b(&self) {
+        self.0.borrow_mut().b.propagate();
+    }
+    fn link_to(&'a self, other: &'a Self) {
+        {
+            // forward bind
+            let source_binding = &mut self.0.borrow_mut().f;
+            let dist_binding = &mut other.0.borrow_mut().f;
+            let num_used = source_binding.values.len();
+            let link = Connection::new(source_binding.values[num_used].clone(), self);
+            source_binding.codomain.push(link.clone());
+            dist_binding.domain.push(link);
+        }
+        {
+            // backward bind
+            let source_binding = &mut other.0.borrow_mut().b;
+            let dist_binding = &mut self.0.borrow_mut().b;
+            let num_used = source_binding.values.len();
+            let link = Connection::new(source_binding.values[num_used].clone(), self);
+            source_binding.codomain.push(link.clone());
+            dist_binding.domain.push(link);
+        }
+    }
+    /*
+    // fn propagate_value_to(&'a self, target: &'a Self) {
+    //     let mut target_binding = target.0.borrow_mut();
+    //     let f = &target_binding.forward;
+    //     let Some(input) = &self.0.borrow().output.data else { panic!(); };
+    //     let p = f(input.clone());
+    //     target_binding.seed = Some(self);
+    //     target_binding.output.data = Some(p);
+    // }
+    fn propagate_from(&'a self, sources: &[&'a Self]) {
+        let mut self_binding = self.0.borrow_mut();
+        let f = &self_binding.forward;
+        let vars = sources
+            .iter()
+            .map(|s| {
+                let p = f(s.outbut.data.clone());
+                Variable::new(p)
+            })
+            .collect();
+        self_binding.seeds = sources.to_vec();
+        self_binding.outputs = vars;
     }
     fn propagate_grad(&self) -> D {
         let my_binding = self.0.borrow_mut();
@@ -89,8 +219,7 @@ impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
         while let Some(f) = stack.pop() {
             if !f.is_constant() {
                 f.propagate_grad();
-                let Some(s) = f.seed() else { panic!(); };
-                stack.push(s);
+                f.seeds().for_each(|s| stack.push(s));
             }
         }
     }
@@ -114,26 +243,12 @@ impl<'a, D: ContinuousDomain + Default> FunctionOn<'a, D> for Function<'a, D> {
         let y1 = f(x1);
         (y1 - y0) / (eps.clone() + eps.clone())
     }
-    fn input(&self) -> Option<D> {
-        self.0
-            .borrow()
-            .seed
-            .and_then(|seed| seed.0.borrow().output.data.clone())
-    }
-    fn seed(&'a self) -> Option<&'a Function<D>> {
-        self.0.borrow().seed
-    }
-    fn value(&self) -> Option<D> {
-        self.0.borrow().output.data.clone()
-    }
-    fn grad(&self) -> Option<D> {
-        self.0.borrow().output.grad.clone()
-    }
     fn set_grad(&self, val: D) {
-        self.0.borrow_mut().output.grad = Some(val);
+        self.0.borrow_mut().outputs.iter_mut().map(|v| v.grad = val);
     }
+    */
 }
-
+/*
 pub fn function_square<'a, D: ContinuousDomain + Default>(
     _lifetime_designator: &'a Function<'a, D>,
 ) -> Function<'a, D> {
@@ -252,3 +367,4 @@ mod tests {
         test_step_7_3();
     }
 }
+*/
