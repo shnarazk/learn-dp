@@ -40,10 +40,7 @@ pub trait FunctionOn<'a, D: ContinuousDomain> {
     fn propagate_forward(&'a self);
     fn propagate_backward(&'a self);
     fn followed_by(&'a self, other: &'a Self) -> &Self;
-    // fn numerical_diff(&'a mut self, x: &'a Variable<D>, eps: &D) -> D;
-    // fn inputs(&'a self) -> Iter<'a, &'a D>;
-    // fn outputs(&self) -> Iter<&'a D>;
-    // fn set_grad(&self, val: D);
+    fn numerical_diff(&self, x: &D, eps: &D) -> D;
 }
 
 #[derive(Debug, Default)]
@@ -111,12 +108,6 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
         let a = &self.0.borrow().b;
         f(a)
     }
-    // fn inputs(&self) -> Iter<&D> {
-    //     self.0.borrow().f.domain.iter().map(|l| &l.value)
-    // }
-    // fn outputs(&self) -> Iter<&D> {
-    //     self.0.borrow().f.values.iter()
-    // }
     fn is_coterminal(&self) -> bool {
         let binding = self.0.borrow();
         let f = &binding.f;
@@ -174,40 +165,12 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
     fn followed_by(&'a self, other: &'a Self) -> &Self {
         self.link_to(other);
         other
-        // let f_f = self.0.borrow().f.arrow.clone();
-        // let f_g = other.0.borrow().f.arrow.clone();
-        // let b_f = self.0.borrow().b.arrow.clone();
-        // let b_g = other.0.borrow().b.arrow.clone();
-        // Function::new(
-        //     match (f_g, f_f) {
-        //         (Some(g), Some(f)) => DFN!(move |x: D| g(f(x))),
-        //         (Some(g), None) => DFN!(move |x: D| g(x)),
-        //         (None, Some(f)) => DFN!(move |x: D| f(x)),
-        //         (None, None) => None,
-        //     },
-        //     // FIXME: this is not correct.
-        //     match (b_g, b_f) {
-        //         (Some(g), Some(f)) => DFN!(move |x: D| f(g(x))),
-        //         (Some(g), None) => DFN!(move |x: D| g(x)),
-        //         (None, Some(f)) => DFN!(move |x: D| f(x)),
-        //         (None, None) => None,
-        //     },
-        // )
     }
-    /*
-    fn numerical_diff(&'a mut self, x: &'a Variable<D>, eps: &D) -> D {
-        let Variable { data: Some(input), .. } = x else { panic!(); };
-        let f = &*self.0.borrow().forward;
-        let x0 = input.clone() - eps.clone();
-        let x1 = input.clone() + eps.clone();
-        let y0 = f(x0);
-        let y1 = f(x1);
-        (y1 - y0) / (eps.clone() + eps.clone())
+    fn numerical_diff(&self, x: &D, eps: &D) -> D {
+        (self.on_f(|a| (a.arrow.as_ref().unwrap())(x.clone() + eps.clone()))
+            - self.on_f(|a| a.arrow.as_ref().unwrap()(x.clone() - eps.clone())))
+            / (eps.clone() + eps.clone())
     }
-    fn set_grad(&self, val: D) {
-        self.0.borrow_mut().outputs.iter_mut().map(|v| v.grad = val);
-    }
-    */
 }
 
 fn square<'a, D: ContinuousDomain>(_lifetime: &'a Function<'a, D>) -> Function<'a, D> {
