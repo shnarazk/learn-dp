@@ -23,6 +23,7 @@ impl<'a, D: ContinuousDomain + std::fmt::Debug> std::fmt::Debug for Connection<'
             .finish()
     }
 }
+
 impl<'a, D: ContinuousDomain> Connection<'a, D> {
     pub fn new(value: Option<D>, source: &'a Function<'a, D>, target: &'a Function<'a, D>) -> Self {
         Connection(Rc::new(RefCell::new(ConnectionBody {
@@ -43,7 +44,7 @@ impl<'a, D: ContinuousDomain> Connection<'a, D> {
 #[derive(Default)]
 pub struct Arrow<'a, D: ContinuousDomain> {
     domain: Vec<Connection<'a, D>>,
-    arrow: Option<Rc<Box<dyn Fn(D) -> D>>>,
+    pub arrow: Option<Rc<Box<dyn Fn(D) -> D>>>,
     values: Vec<D>,
     codomain: Vec<Connection<'a, D>>,
 }
@@ -56,6 +57,20 @@ impl<D: ContinuousDomain> Clone for Arrow<'_, D> {
             values: self.values.clone(),
             codomain: Vec::new(),
         }
+    }
+}
+
+impl<'a, D: ContinuousDomain + std::fmt::Debug> std::fmt::Debug for Arrow<'a, D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct(if self.arrow.is_some() {
+            "Arrow"
+        } else {
+            "Variable"
+        })
+        .field("domain", &self.domain)
+        .field("values", &self.values)
+        .field("codomain", &self.codomain)
+        .finish()
     }
 }
 
@@ -98,11 +113,19 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
     }
     pub fn apply(&mut self) {
         if let Some(f) = &self.arrow {
+            // normal arrow
             assert!(self.is_applicable());
             self.values = self
                 .domain
                 .iter()
                 .map(|c| f(c.0.borrow().value.as_ref().unwrap().clone()))
+                .collect::<Vec<_>>();
+        } else if !self.domain.is_empty() && self.values.is_empty() {
+            // terminal
+            self.values = self
+                .domain
+                .iter()
+                .map(|c| c.0.borrow().value.as_ref().unwrap().clone())
                 .collect::<Vec<_>>();
         }
     }
@@ -110,14 +133,17 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
         self.domain.iter().all(|x| x.0.borrow().value.is_some())
     }
     pub fn is_applied(&self) -> bool {
-        self.is_applicable() && (self.is_coterminal() || (self.domain.len() == self.values.len()))
+        // self.is_applicable() && (self.domain.len() == self.values.len())
+        !self.values.is_empty()
     }
     pub fn propagate(&mut self) -> Option<Vec<&'a Function<'a, D>>> {
-        (self.is_coterminal() || (!self.is_applied() && self.is_applicable())).then(|| {
+        (self.is_coterminal()
+            || (self.is_terminal() && (!self.is_applied()) || self.is_applicable()))
+        .then(|| {
             self.apply();
-            assert_eq!(self.values.len(), self.codomain.len());
-            for (i, v) in self.values.iter().enumerate() {
-                self.codomain[i].0.borrow_mut().value = Some(v.clone());
+            assert!(self.is_terminal() || self.values.len() == self.codomain.len());
+            for (i, t) in self.codomain.iter().enumerate() {
+                t.0.borrow_mut().value = Some(self.values[i].clone());
             }
             self.codomain
                 .iter()
