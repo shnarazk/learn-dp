@@ -288,25 +288,35 @@ mod tests {
             .followed_by(&c)
             .followed_by(&y);
         x.propagate_forward();
-        y.propagate_backward();
         assert!((y.on_f(|a| a.outputs())[0] - 1.64872127).abs() < 0.0001);
     }
+    #[test]
+    fn test_step_4_2() {
+        let x: Function<f64> = VARIABLE!(2.0);
+        let f: Function<f64> = square::<f64>(&x);
+        assert!((f.numerical_diff(&2.0, &0.0001) - 4.0).abs() < 0.0001);
+    }
+    #[test]
+    fn test_step_4_3() {
+        let e = 0.00001;
+        let x: Function<f64> = VARIABLE!(0.5 - e, 0.5 + e);
+        let y: Function<f64> = TERMINAL!(1.0);
+        let a: Function<f64> = square::<f64>(&x);
+        let b: Function<f64> = exp_f64(&x);
+        let c: Function<f64> = square::<f64>(&x);
+        x.followed_by(&a)
+            .followed_by(&b)
+            .followed_by(&c)
+            .followed_by(&y);
+        x.followed_by(&a)
+            .followed_by(&b)
+            .followed_by(&c)
+            .followed_by(&y);
+        x.propagate_forward();
+        let r = y.on_f(|a| a.outputs());
+        assert!(((r[1] - r[0]) / (2.0 * e) - 3.2974426).abs() < 0.0001);
+    }
     /*
-        #[test]
-        fn test_step_4_2() {
-            let x: Variable<f32> = Variable::new(2.0f32);
-            let mut s: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
-            assert!((s.numerical_diff(&x, &0.0001) - 4.0f32).abs() < 0.005);
-        }
-        #[test]
-        fn test_step_4_3() {
-            let x: Variable<f32> = Variable::new(0.5f32);
-            let a: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
-            let b: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.exp()));
-            let c: Function<f32> = Function::<f32>::new(Box::new(|x: f32| x.powi(2)));
-            let mut chain: Function<f32> = a.followed_by(&b).followed_by(&c);
-            assert!((chain.numerical_diff(&x, &0.0001) - 3.2974426).abs() < 0.001);
-        }
         #[test]
         fn test_step_6_3() {
             let x = Function::constant(0.5f64);
