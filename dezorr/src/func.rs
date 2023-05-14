@@ -15,6 +15,20 @@ macro_rules! DFN {
     };
 }
 
+#[macro_export]
+macro_rules! VARIABLE {
+    ($($c: expr),+) => {
+        Function::coterminal(vec![$($c),*])
+    };
+}
+
+#[macro_export]
+macro_rules! TERMINAL {
+    ($($c: expr),+) => {
+        Function::terminal(vec![$($c),*])
+    };
+}
+
 pub trait FunctionOn<'a, D: ContinuousDomain> {
     fn on_f<T>(&self, f: impl Fn(&Arrow<'a, D>) -> T) -> T;
     fn on_b<T>(&self, f: impl Fn(&Arrow<'a, D>) -> T) -> T;
@@ -25,7 +39,7 @@ pub trait FunctionOn<'a, D: ContinuousDomain> {
     fn link_to(&'a self, other: &'a Self);
     fn propagate_forward(&'a self);
     fn propagate_backward(&'a self);
-    fn followed_by(&'a self, other: &'a Self) -> Self;
+    fn followed_by(&'a self, other: &'a Self) -> &Self;
     // fn numerical_diff(&'a mut self, x: &'a Variable<D>, eps: &D) -> D;
     // fn inputs(&'a self) -> Iter<'a, &'a D>;
     // fn outputs(&self) -> Iter<&'a D>;
@@ -157,26 +171,28 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
         }
     }
     /// step 3: function composition
-    fn followed_by(&'a self, other: &'a Self) -> Self {
-        let f_f = self.0.borrow().f.arrow.clone();
-        let f_g = other.0.borrow().f.arrow.clone();
-        let b_f = self.0.borrow().b.arrow.clone();
-        let b_g = other.0.borrow().b.arrow.clone();
-        Function::new(
-            match (f_g, f_f) {
-                (Some(g), Some(f)) => DFN!(move |x: D| g(f(x))),
-                (Some(g), None) => DFN!(move |x: D| g(x)),
-                (None, Some(f)) => DFN!(move |x: D| f(x)),
-                (None, None) => None,
-            },
-            // FIXME: this is not correct.
-            match (b_g, b_f) {
-                (Some(g), Some(f)) => DFN!(move |x: D| f(g(x))),
-                (Some(g), None) => DFN!(move |x: D| g(x)),
-                (None, Some(f)) => DFN!(move |x: D| f(x)),
-                (None, None) => None,
-            },
-        )
+    fn followed_by(&'a self, other: &'a Self) -> &Self {
+        self.link_to(other);
+        other
+        // let f_f = self.0.borrow().f.arrow.clone();
+        // let f_g = other.0.borrow().f.arrow.clone();
+        // let b_f = self.0.borrow().b.arrow.clone();
+        // let b_g = other.0.borrow().b.arrow.clone();
+        // Function::new(
+        //     match (f_g, f_f) {
+        //         (Some(g), Some(f)) => DFN!(move |x: D| g(f(x))),
+        //         (Some(g), None) => DFN!(move |x: D| g(x)),
+        //         (None, Some(f)) => DFN!(move |x: D| f(x)),
+        //         (None, None) => None,
+        //     },
+        //     // FIXME: this is not correct.
+        //     match (b_g, b_f) {
+        //         (Some(g), Some(f)) => DFN!(move |x: D| f(g(x))),
+        //         (Some(g), None) => DFN!(move |x: D| g(x)),
+        //         (None, Some(f)) => DFN!(move |x: D| f(x)),
+        //         (None, None) => None,
+        //     },
+        // )
     }
     /*
     fn numerical_diff(&'a mut self, x: &'a Variable<D>, eps: &D) -> D {
@@ -211,9 +227,9 @@ mod tests {
     use super::*;
     #[test]
     fn test_step_2_base1() {
-        let c0: Function<usize> = Function::coterminal(vec![0usize]);
+        let c0: Function<usize> = VARIABLE!(0);
         let f0: Function<usize> = Function::<usize>::new(DFN!(|x| x + 1), DFN!(|_| 1));
-        let y0: Function<usize> = Function::<usize>::terminal(vec![1usize]);
+        let y0: Function<usize> = TERMINAL!(1);
         c0.link_to(&f0);
         f0.link_to(&y0);
         dbg!(c0.propagate_f());
@@ -227,9 +243,9 @@ mod tests {
     }
     #[test]
     fn test_step_2_base2() {
-        let c0: Function<usize> = Function::coterminal(vec![0usize]);
+        let c0: Function<usize> = VARIABLE!(0);
         let f0: Function<usize> = Function::<usize>::new(DFN!(|x| x + 1), DFN!(|_| 1));
-        let y0: Function<usize> = Function::<usize>::terminal(vec![1usize]);
+        let y0: Function<usize> = TERMINAL!(1);
         c0.link_to(&f0);
         f0.link_to(&y0);
         c0.propagate_forward();
@@ -238,8 +254,8 @@ mod tests {
     }
     #[test]
     fn test_step_2_base3() {
-        let x: Function<f64> = Function::coterminal(vec![2.0, -1.0]);
-        let y: Function<f64> = Function::terminal(vec![1.0, 1.0]);
+        let x: Function<f64> = VARIABLE!(2.0, -1.0);
+        let y: Function<f64> = TERMINAL!(1.0, 1.0);
         let f1: Function<f64> = Function::new(DFN!(|x: f64| x + 1.0), DFN!(|_| 1.0));
         x.link_to(&f1);
         x.link_to(&f1);
@@ -254,8 +270,8 @@ mod tests {
     }
     #[test]
     fn test_step_2_base4() {
-        let x: Function<f64> = Function::coterminal(vec![1.0, 2.0]);
-        let y: Function<f64> = Function::terminal(vec![1.0, 1.0]);
+        let x: Function<f64> = VARIABLE!(1.0, 2.0);
+        let y: Function<f64> = TERMINAL!(1.0, 1.0);
         let fa: Function<f64> = Function::new(DFN!(|x| 2.0 * x), DFN!(|_| 2.0));
         let fb: Function<f64> = Function::new(DFN!(|x| 1.0 / x), DFN!(|x| -1.0 * x.powi(-2)));
         // let f1 = fa.followed_by(&fb);
@@ -275,12 +291,14 @@ mod tests {
     }
     #[test]
     fn test_step_2_base5() {
-        let x: Function<f64> = Function::coterminal(vec![1.0, 0.0]);
-        let y: Function<f64> = Function::terminal(vec![1.0, 1.0]);
+        let x: Function<f64> = VARIABLE!(1.0f64, 0.0);
+        let y: Function<f64> = TERMINAL!(1.0, 1.0);
         let f0: Function<f64> = Function::new(DFN!(|x| x.exp()), DFN!(|x| x.exp()));
-        let f1 = f0.followed_by(&f0);
-        x.link_to(&f1);
-        x.link_to(&f1);
+        let f1: Function<f64> = Function::new(DFN!(|x| x.exp()), DFN!(|x| x.exp()));
+        x.link_to(&f0);
+        x.link_to(&f0);
+        f0.link_to(&f1);
+        f0.link_to(&f1);
         f1.link_to(&y);
         f1.link_to(&y);
         x.propagate_forward();
@@ -291,7 +309,10 @@ mod tests {
         );
         assert_eq!(
             x.on_b(|a| a.outputs()),
-            vec![1.0f64.exp().exp(), 0.0f64.exp().exp()]
+            vec![
+                1.0f64.exp() * 1.0f64.exp().exp(),
+                0.0f64.exp() * 0.0f64.exp().exp()
+            ]
         );
     }
     #[test]
