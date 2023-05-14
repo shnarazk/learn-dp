@@ -98,7 +98,7 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
     }
     pub fn apply(&mut self) {
         if let Some(f) = &self.arrow {
-            assert!(self.is_appliable());
+            assert!(self.is_applicable());
             self.values = self
                 .domain
                 .iter()
@@ -106,14 +106,14 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
                 .collect::<Vec<_>>();
         }
     }
-    pub fn is_appliable(&self) -> bool {
+    pub fn is_applicable(&self) -> bool {
         self.domain.iter().all(|x| x.0.borrow().value.is_some())
     }
     pub fn is_applied(&self) -> bool {
-        self.is_appliable() && (self.is_coterminal() || (self.domain.len() == self.values.len()))
+        self.is_applicable() && (self.is_coterminal() || (self.domain.len() == self.values.len()))
     }
     pub fn propagate(&mut self) -> Option<Vec<&'a Function<'a, D>>> {
-        (self.is_coterminal() || (!self.is_applied() && self.is_appliable())).then(|| {
+        (self.is_coterminal() || (!self.is_applied() && self.is_applicable())).then(|| {
             self.apply();
             assert_eq!(self.values.len(), self.codomain.len());
             for (i, v) in self.values.iter().enumerate() {
@@ -151,7 +151,7 @@ mod tests {
         let c0 = Connection::new(Some(0.0f64), &f0, &f1);
         a0.codomain.push(c0.clone());
         assert!(a0.is_coterminal());
-        assert!(a0.is_appliable());
+        assert!(a0.is_applicable());
         assert!(a0.is_applied());
         assert!(a1.is_terminal());
         a1.add_input(c0);

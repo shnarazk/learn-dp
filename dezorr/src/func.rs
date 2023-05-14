@@ -5,7 +5,7 @@ use {
         arrow::{Arrow, Connection},
         types::ContinuousDomain,
     },
-    std::cell::RefCell,
+    std::{cell::RefCell, collections::VecDeque},
 };
 
 pub trait FunctionOn<'a, D: ContinuousDomain> {
@@ -14,6 +14,8 @@ pub trait FunctionOn<'a, D: ContinuousDomain> {
     fn terminal(value: Vec<D>) -> Self;
     fn is_coterminal(&'a self) -> bool;
     fn link_to(&'a self, other: &'a Self);
+    fn propagate_forward(&'a self);
+    fn propagate_backward(&'a self);
     // fn propagate_from(&'a self, v: &[&'a Self]);
     // fn propagate_backward(&'a self, base: D);
     // fn set_backward(self, function: Box<dyn Fn(D) -> D>) -> Self;
@@ -43,17 +45,17 @@ impl<D: ContinuousDomain> Clone for Function<'_, D> {
 }
 
 impl<'a, D: ContinuousDomain> Function<'a, D> {
-    fn apply_f(&self) {
-        self.0.borrow_mut().f.apply();
+    // fn apply_f(&self) {
+    //     self.0.borrow_mut().f.apply();
+    // }
+    // fn apply_b(&self) {
+    //     self.0.borrow_mut().b.apply();
+    // }
+    fn propagate_f(&'a self) -> Option<Vec<&'a Function<'a, D>>> {
+        self.0.borrow_mut().f.propagate()
     }
-    fn apply_b(&self) {
-        self.0.borrow_mut().b.apply();
-    }
-    fn propagate_f(&'a self) {
-        self.0.borrow_mut().f.propagate();
-    }
-    fn propagate_b(&'a self) {
-        self.0.borrow_mut().b.propagate();
+    fn propagate_b(&'a self) -> Option<Vec<&'a Function<'a, D>>> {
+        self.0.borrow_mut().b.propagate()
     }
 }
 
@@ -111,6 +113,28 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
             source_binding.add_output(link.clone());
             // dist_binding.domain.push(link);
             dist_binding.add_input(link);
+        }
+    }
+    fn propagate_forward(&'a self) {
+        let mut to_propagate = VecDeque::new();
+        to_propagate.push_front(self);
+        while let Some(f) = to_propagate.pop_front() {
+            if let Some(fs) = f.propagate_f() {
+                for g in fs.iter() {
+                    to_propagate.push_back(g);
+                }
+            }
+        }
+    }
+    fn propagate_backward(&'a self) {
+        let mut to_propagate = VecDeque::new();
+        to_propagate.push_front(self);
+        while let Some(f) = to_propagate.pop_front() {
+            if let Some(fs) = f.propagate_b() {
+                for g in fs.iter() {
+                    to_propagate.push_back(g);
+                }
+            }
         }
     }
     /*
@@ -211,9 +235,9 @@ mod tests {
         c0.propagate_f();
         assert!(c0.0.borrow().f.is_applied());
         println!("#3 passed");
-        assert!(f0.0.borrow().f.is_appliable());
+        assert!(f0.0.borrow().f.is_applicable());
         println!("#4 passed");
-        f0.apply_f();
+        f0.0.borrow_mut().f.apply();
         assert!(f0.0.borrow().f.is_applied());
         println!("#5 passed");
         // c0.propagate_value_to(&f0);
