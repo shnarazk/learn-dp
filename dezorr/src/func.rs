@@ -316,44 +316,36 @@ mod tests {
         let r = y.on_f(|a| a.outputs());
         assert!(((r[1] - r[0]) / (2.0 * e) - 3.2974426).abs() < 0.0001);
     }
-    /*
-        #[test]
-        fn test_step_6_3() {
-            let x = Function::constant(0.5f64);
-            let fa = function_square(&x);
-            let fb = function_exp_f64(&x);
-            let fc = function_square::<f64>(&x);
-            x.propagate_value_to(&fa);
-            assert_eq!(x.value(), fa.input());
-            fa.propagate_value_to(&fb);
-            assert_eq!(fa.value(), fb.input());
-            fb.propagate_value_to(&fc);
-            assert_eq!(fb.value(), fc.input());
-            assert!((fc.value().unwrap() - 1.6487212).abs() < 0.001);
-            fc.set_grad(1.0);
-            fc.propagate_grad();
-            fb.propagate_grad();
-            fa.propagate_grad();
-            assert!((x.grad().unwrap() - 3.29744).abs() < 0.0001);
-        }
-        #[test]
-        fn test_step_7_3() {
-            let x0 = Function::constant(0.5f64);
-            let fa = function_square(&x0);
-            let fb = function_exp_f64(&x0);
-            let fc = function_square::<f64>(&x0);
-
-            x0.propagate_value_to(&fa);
-            fa.propagate_value_to(&fb);
-            fb.propagate_value_to(&fc);
-
-            fc.propagate_backward(1.0);
-
-            assert!((x0.grad().unwrap() - 3.2974425).abs() < 0.00001);
-        }
-        #[test]
-        fn test_step_8_3() {
-            test_step_7_3();
-        }
-    */
+    #[test]
+    fn test_step_6_4() {
+        let x: Function<f64> = VARIABLE!(0.5);
+        let y: Function<f64> = TERMINAL!(1.0);
+        let a: Function<f64> = square::<f64>(&x);
+        let b: Function<f64> = exp_f64(&x);
+        let c: Function<f64> = square::<f64>(&x);
+        x.followed_by(&a)
+            .followed_by(&b)
+            .followed_by(&c)
+            .followed_by(&y);
+        x.propagate_forward();
+        y.propagate_backward();
+        assert!((x.on_b(|a| a.outputs())[0] - 3.2974425).abs() < 0.0001);
+    }
+    #[test]
+    fn test_step_7_3() {
+        test_step_6_4();
+    }
+    #[test]
+    fn test_step_8_3() {
+        test_step_7_3();
+    }
+    #[test]
+    fn test_step_11_2() {
+        let x: Function<usize> = VARIABLE!(2, 3);
+        let y: Function<usize> = TERMINAL!(1);
+        let f: Function<usize> = Function::new(DFN!(|_| todo!()), None);
+        x.followed_by(&f).followed_by(&y);
+        x.propagate_forward();
+        assert_eq!(y.on_b(|a| a.outputs()), vec![5]);
+    }
 }
