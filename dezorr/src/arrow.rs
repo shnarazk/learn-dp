@@ -5,6 +5,24 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+#[macro_export]
+macro_rules! DFN {
+    ($f: expr) => {
+        Some(Box::new(|xs| {
+            xs.iter().map(|r| $f(r.clone())).collect::<Vec<_>>()
+        }))
+    };
+}
+
+#[macro_export]
+macro_rules! TFN {
+    ($f: expr) => {
+        Some(Box::new($f))
+    };
+}
+
+pub type ArrowType<D> = Box<dyn Fn(&[D]) -> Vec<D>>;
+
 #[derive(Clone)]
 struct ConnectionBody<'a, D: ContinuousDomain> {
     value: Option<D>,
@@ -44,7 +62,7 @@ impl<'a, D: ContinuousDomain> Connection<'a, D> {
 #[derive(Default)]
 pub struct Arrow<'a, D: ContinuousDomain> {
     domain: Vec<Connection<'a, D>>,
-    pub arrow: Option<Rc<Box<dyn Fn(D) -> D>>>,
+    pub arrow: Option<Rc<ArrowType<D>>>,
     values: Vec<D>,
     codomain: Vec<Connection<'a, D>>,
 }
@@ -75,7 +93,7 @@ impl<'a, D: ContinuousDomain + std::fmt::Debug> std::fmt::Debug for Arrow<'a, D>
 }
 
 impl<'a, D: ContinuousDomain> Arrow<'a, D> {
-    pub fn new(function: Option<Box<dyn Fn(D) -> D>>) -> Self {
+    pub fn new(function: Option<ArrowType<D>>) -> Self {
         Arrow {
             arrow: function.map(Rc::new),
             ..Arrow::default()
@@ -122,11 +140,16 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
         if let Some(f) = &self.arrow {
             // normal arrow
             assert!(self.is_applicable());
-            self.values = self
+            // self.values = self
+            //     .domain
+            //     .iter()
+            //     .map(|c| f(c.0.borrow().value.as_ref().unwrap().clone()))
+            let data = self
                 .domain
                 .iter()
-                .map(|c| f(c.0.borrow().value.as_ref().unwrap().clone()))
-                .collect::<Vec<_>>();
+                .map(|c| c.0.borrow().value.as_ref().unwrap().clone())
+                .collect::<Vec<D>>();
+            self.values = f(&data);
         } else if !self.domain.is_empty() && self.values.is_empty() {
             // terminal
             self.values = self
@@ -140,11 +163,18 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
         if let Some(f) = &self.arrow {
             // normal arrow
             assert!(self.is_applicable());
-            self.values = self
-                .domain
-                .iter()
+            // self.values = self
+            //     .domain
+            //     .iter()
+            //     .enumerate()
+            //     .map(|(i, k)| k.0.borrow().value.as_ref().unwrap().clone() * f(forward[i].clone()))
+            //     .collect::<Vec<_>>();
+            let data = forward.iter().map(|v| (*v).clone()).collect::<Vec<_>>();
+            let output = f(&data);
+            self.values = output
+                .into_iter()
                 .enumerate()
-                .map(|(i, k)| k.0.borrow().value.as_ref().unwrap().clone() * f(forward[i].clone()))
+                .map(|(i, x)| self.domain[i].0.borrow().value.as_ref().unwrap().clone() * x)
                 .collect::<Vec<_>>();
         } else if !self.domain.is_empty() && self.values.is_empty() {
             // terminal
@@ -203,8 +233,8 @@ mod tests {
     fn test_arrow_basic() {
         let mut a0: Arrow<f64> = Arrow::coterminal(vec![0.0f64]);
         let mut a1: Arrow<f64> = Arrow::terminal();
-        let mut _a2: Arrow<f64> = Arrow::new(Some(Box::new(|x| x + 1.0)));
-        let mut _a3: Arrow<f64> = Arrow::new(Some(Box::new(|x| x - 1.0)));
+        let mut _a2: Arrow<f64> = Arrow::new(DFN!(|x| x + 1.0));
+        let mut _a3: Arrow<f64> = Arrow::new(DFN!(|x| x - 1.0));
         let f0: Function<f64> = Function::coterminal(vec![0.0f64]);
         let f1: Function<f64> = Function::terminal(vec![1.0f64]);
         let c0 = Connection::new(Some(0.0f64), &f0, &f1);
