@@ -62,12 +62,6 @@ impl<D: ContinuousDomain> Clone for Function<'_, D> {
 }
 
 impl<'a, D: ContinuousDomain> Function<'a, D> {
-    // fn apply_f(&self) {
-    //     self.0.borrow_mut().f.apply();
-    // }
-    // fn apply_b(&self) {
-    //     self.0.borrow_mut().b.apply();
-    // }
     fn propagate_f(&'a self) -> Option<Vec<&'a Function<'a, D>>> {
         self.0.borrow_mut().f.propagate_forward()
     }
@@ -118,24 +112,17 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
             // forward bonding
             let source_binding = &mut self.0.borrow_mut().f;
             let dist_binding = &mut target.0.borrow_mut().f;
-            // let num_used = source_binding.codomain.len();
-            // assert!(num_used < source_binding.values.len());
+            // assert!(source_binding.codomain.len()< source_binding.values.len());
             let link = Connection::new(None, self, target);
-            // source_binding.codomain.push(link.clone());
             source_binding.add_output(link.clone());
-            // dist_binding.domain.push(link);
             dist_binding.add_input(link);
         }
         {
             // backward bonding
             let source_binding = &mut target.0.borrow_mut().b;
             let dist_binding = &mut self.0.borrow_mut().b;
-            // let num_used = source_binding.codomain.len();
-            // assert!(num_used < source_binding.values.len());
             let link = Connection::new(None, target, self);
-            // source_binding.codomain.push(link.clone());
             source_binding.add_output(link.clone());
-            // dist_binding.domain.push(link);
             dist_binding.add_input(link);
         }
     }
@@ -280,14 +267,14 @@ mod tests {
     }
     #[test]
     fn test_step_2() {
-        // c1.propagate_value_to(&f1);
-        // assert_eq!(f1.value(), Some(3.0));
-        // let f2: Function<f64> = Function::<f64>::new(Box::new(|x: f64| x.exp()));
-        // c1.propagate_value_to(&f2);
-        // assert!((f2.value().unwrap() - 7.389056).abs() < 0.001);
-        // let f3: Function<f64> = f2.clone();
-        // c1.propagate_value_to(&f3);
-        // assert_eq!(f3.value(), f2.value());
+        let x: Function<usize> = VARIABLE!(10);
+        let f: Function<usize> = square::<usize>(&x);
+        let y: Function<usize> = TERMINAL!(1);
+        x.followed_by(&f);
+        f.followed_by(&y);
+        x.propagate_forward();
+        y.propagate_backward();
+        assert_eq!(y.on_f(|a| a.outputs()), vec![100]);
     }
     /*
         #[test]
