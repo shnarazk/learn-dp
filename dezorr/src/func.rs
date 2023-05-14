@@ -58,10 +58,15 @@ impl<'a, D: ContinuousDomain> Function<'a, D> {
     //     self.0.borrow_mut().b.apply();
     // }
     fn propagate_f(&'a self) -> Option<Vec<&'a Function<'a, D>>> {
-        self.0.borrow_mut().f.propagate()
+        self.0.borrow_mut().f.propagate_forward()
     }
     fn propagate_b(&'a self) -> Option<Vec<&'a Function<'a, D>>> {
-        self.0.borrow_mut().b.propagate()
+        let inputs = self.on_f(|a| a.inputs());
+        let inputs = inputs
+            .iter()
+            .map(|x| x.as_ref().unwrap())
+            .collect::<Vec<&D>>();
+        self.0.borrow_mut().b.propagate_backward(&inputs)
     }
 }
 
@@ -164,6 +169,7 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
                 (None, Some(f)) => DFN!(move |x: D| f(x)),
                 (None, None) => None,
             },
+            // FIXME: this is not correct.
             match (b_g, b_f) {
                 (Some(g), Some(f)) => DFN!(move |x: D| f(g(x))),
                 (Some(g), None) => DFN!(move |x: D| g(x)),
@@ -204,55 +210,100 @@ fn exp_f64<'a>(_lifetime_designator: &'a Function<'a, f64>) -> Function<'static,
 mod tests {
     use super::*;
     #[test]
+    fn test_step_2_base1() {
+        let c0: Function<usize> = Function::coterminal(vec![0usize]);
+        let f0: Function<usize> = Function::<usize>::new(DFN!(|x| x + 1), DFN!(|_| 1));
+        let y0: Function<usize> = Function::<usize>::terminal(vec![1usize]);
+        c0.link_to(&f0);
+        f0.link_to(&y0);
+        dbg!(c0.propagate_f());
+        assert!(c0.on_f(|a| a.is_applied()));
+        assert!(f0.on_f(|a| a.is_applicable()));
+        assert!(f0.on_f(|a| !a.is_applied()));
+        dbg!(f0.propagate_f());
+        assert!(f0.on_f(|a| a.is_applied()));
+        assert_eq!(f0.on_f(|a| a.outputs()), vec![1]);
+        assert_eq!(y0.on_f(|a| a.inputs()), vec![Some(1)]);
+    }
+    #[test]
+    fn test_step_2_base2() {
+        let c0: Function<usize> = Function::coterminal(vec![0usize]);
+        let f0: Function<usize> = Function::<usize>::new(DFN!(|x| x + 1), DFN!(|_| 1));
+        let y0: Function<usize> = Function::<usize>::terminal(vec![1usize]);
+        c0.link_to(&f0);
+        f0.link_to(&y0);
+        c0.propagate_forward();
+        assert_eq!(f0.on_f(|a| a.outputs()), vec![1]);
+        assert_eq!(y0.on_f(|a| a.inputs()), vec![Some(1)]);
+    }
+    #[test]
+    fn test_step_2_base3() {
+        let x: Function<f64> = Function::coterminal(vec![2.0, -1.0]);
+        let y: Function<f64> = Function::terminal(vec![1.0, 1.0]);
+        let f1: Function<f64> = Function::new(DFN!(|x: f64| x + 1.0), DFN!(|_| 1.0));
+        x.link_to(&f1);
+        x.link_to(&f1);
+        f1.link_to(&y);
+        f1.link_to(&y);
+        x.propagate_forward();
+        y.propagate_backward();
+        assert_eq!(f1.on_f(|a| a.outputs()), vec![3.0, 0.0]);
+        assert_eq!(y.on_f(|a| a.inputs()), vec![Some(3.0), Some(0.0)]);
+        assert_eq!(y.on_f(|a| a.outputs()), vec![3.0, 0.0]);
+        assert_eq!(x.on_b(|a| a.outputs()), vec![1.0, 1.0]);
+    }
+    #[test]
+    fn test_step_2_base4() {
+        let x: Function<f64> = Function::coterminal(vec![1.0, 2.0]);
+        let y: Function<f64> = Function::terminal(vec![1.0, 1.0]);
+        let fa: Function<f64> = Function::new(DFN!(|x| 2.0 * x), DFN!(|_| 2.0));
+        let fb: Function<f64> = Function::new(DFN!(|x| 1.0 / x), DFN!(|x| -1.0 * x.powi(-2)));
+        // let f1 = fa.followed_by(&fb);
+        x.link_to(&fa);
+        x.link_to(&fa);
+        fa.link_to(&fb);
+        fa.link_to(&fb);
+        fb.link_to(&y);
+        fb.link_to(&y);
+        x.propagate_forward();
+        y.propagate_backward();
+        assert_eq!(y.on_f(|a| a.outputs()), vec![0.5f64, 0.25f64]);
+        assert_eq!(
+            x.on_b(|a| a.outputs()),
+            vec![2.0f64 * -1.0 / 4.0, 2.0f64 * -1.0 / 16.0]
+        );
+    }
+    #[test]
+    fn test_step_2_base5() {
+        let x: Function<f64> = Function::coterminal(vec![1.0, 0.0]);
+        let y: Function<f64> = Function::terminal(vec![1.0, 1.0]);
+        let f0: Function<f64> = Function::new(DFN!(|x| x.exp()), DFN!(|x| x.exp()));
+        let f1 = f0.followed_by(&f0);
+        x.link_to(&f1);
+        x.link_to(&f1);
+        f1.link_to(&y);
+        f1.link_to(&y);
+        x.propagate_forward();
+        y.propagate_backward();
+        assert_eq!(
+            y.on_f(|a| a.outputs()),
+            vec![1.0f64.exp().exp(), 0.0f64.exp().exp()]
+        );
+        assert_eq!(
+            x.on_b(|a| a.outputs()),
+            vec![1.0f64.exp().exp(), 0.0f64.exp().exp()]
+        );
+    }
+    #[test]
     fn test_step_2() {
-        {
-            let c0: Function<usize> = Function::coterminal(vec![0usize]);
-            let f0: Function<usize> = Function::<usize>::new(DFN!(|x| x + 1), DFN!(|_| 1));
-            let y0: Function<usize> = Function::<usize>::terminal(vec![1usize]);
-            c0.link_to(&f0);
-            f0.link_to(&y0);
-            dbg!(c0.propagate_f());
-            assert!(c0.on_f(|a| a.is_applied()));
-            assert!(f0.on_f(|a| a.is_applicable()));
-            assert!(f0.on_f(|a| !a.is_applied()));
-            dbg!(f0.propagate_f());
-            assert!(f0.on_f(|a| a.is_applied()));
-            assert_eq!(f0.on_f(|a| a.outputs()), vec![1]);
-            assert_eq!(y0.on_f(|a| a.inputs()), vec![Some(1)]);
-        }
-        {
-            let c0: Function<usize> = Function::coterminal(vec![0usize]);
-            let f0: Function<usize> = Function::<usize>::new(DFN!(|x| x + 1), DFN!(|_| 1));
-            let y0: Function<usize> = Function::<usize>::terminal(vec![1usize]);
-            c0.link_to(&f0);
-            f0.link_to(&y0);
-            c0.propagate_forward();
-            assert_eq!(f0.on_f(|a| a.outputs()), vec![1]);
-            assert_eq!(y0.on_f(|a| a.inputs()), vec![Some(1)]);
-        }
-        {
-            let x: Function<f64> = Function::coterminal(vec![2.0, -1.0]);
-            let y: Function<f64> = Function::terminal(vec![1.0, 1.0]);
-            let f1: Function<f64> = Function::new(DFN!(|x: f64| x + 1.0), DFN!(|_| 1.0));
-            x.link_to(&f1);
-            x.link_to(&f1);
-            f1.link_to(&y);
-            f1.link_to(&y);
-            x.propagate_forward();
-            y.propagate_backward();
-            assert_eq!(f1.on_f(|a| a.outputs()), vec![3.0, 0.0]);
-            assert_eq!(y.on_f(|a| a.inputs()), vec![Some(3.0), Some(0.0)]);
-            assert_eq!(y.on_f(|a| a.outputs()), vec![3.0, 0.0]);
-            assert_eq!(x.on_b(|a| a.outputs()), vec![1.0, 1.0]);
-            // c1.propagate_value_to(&f1);
-            // assert_eq!(f1.value(), Some(3.0));
-            // let f2: Function<f64> = Function::<f64>::new(Box::new(|x: f64| x.exp()));
-            // c1.propagate_value_to(&f2);
-            // assert!((f2.value().unwrap() - 7.389056).abs() < 0.001);
-            // let f3: Function<f64> = f2.clone();
-            // c1.propagate_value_to(&f3);
-            // assert_eq!(f3.value(), f2.value());
-        }
+        // c1.propagate_value_to(&f1);
+        // assert_eq!(f1.value(), Some(3.0));
+        // let f2: Function<f64> = Function::<f64>::new(Box::new(|x: f64| x.exp()));
+        // c1.propagate_value_to(&f2);
+        // assert!((f2.value().unwrap() - 7.389056).abs() < 0.001);
+        // let f3: Function<f64> = f2.clone();
+        // c1.propagate_value_to(&f3);
+        // assert_eq!(f3.value(), f2.value());
     }
     /*
         #[test]

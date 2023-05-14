@@ -111,7 +111,14 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
     pub fn outputs(&self) -> Vec<D> {
         self.values.to_vec()
     }
-    pub fn apply(&mut self) {
+    pub fn is_applicable(&self) -> bool {
+        self.domain.iter().all(|x| x.0.borrow().value.is_some())
+    }
+    pub fn is_applied(&self) -> bool {
+        // self.is_applicable() && (self.domain.len() == self.values.len())
+        !self.values.is_empty()
+    }
+    pub fn apply_f(&mut self) {
         if let Some(f) = &self.arrow {
             // normal arrow
             assert!(self.is_applicable());
@@ -129,18 +136,45 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
                 .collect::<Vec<_>>();
         }
     }
-    pub fn is_applicable(&self) -> bool {
-        self.domain.iter().all(|x| x.0.borrow().value.is_some())
+    pub fn apply_b(&mut self, forward: &[&D]) {
+        if let Some(f) = &self.arrow {
+            // normal arrow
+            assert!(self.is_applicable());
+            self.values = self
+                .domain
+                .iter()
+                .enumerate()
+                .map(|(i, k)| k.0.borrow().value.as_ref().unwrap().clone() * f(forward[i].clone()))
+                .collect::<Vec<_>>();
+        } else if !self.domain.is_empty() && self.values.is_empty() {
+            // terminal
+            self.values = self
+                .domain
+                .iter()
+                .map(|c| c.0.borrow().value.as_ref().unwrap().clone())
+                .collect::<Vec<_>>();
+        }
     }
-    pub fn is_applied(&self) -> bool {
-        // self.is_applicable() && (self.domain.len() == self.values.len())
-        !self.values.is_empty()
-    }
-    pub fn propagate(&mut self) -> Option<Vec<&'a Function<'a, D>>> {
+    pub fn propagate_forward(&mut self) -> Option<Vec<&'a Function<'a, D>>> {
         (self.is_coterminal()
             || (self.is_terminal() && (!self.is_applied()) || self.is_applicable()))
         .then(|| {
-            self.apply();
+            self.apply_f();
+            assert!(self.is_terminal() || self.values.len() == self.codomain.len());
+            for (i, t) in self.codomain.iter().enumerate() {
+                t.0.borrow_mut().value = Some(self.values[i].clone());
+            }
+            self.codomain
+                .iter()
+                .map(|c| c.0.borrow().target)
+                .collect::<Vec<_>>()
+        })
+    }
+    pub fn propagate_backward(&mut self, forward: &[&D]) -> Option<Vec<&'a Function<'a, D>>> {
+        (self.is_coterminal()
+            || (self.is_terminal() && (!self.is_applied()) || self.is_applicable()))
+        .then(|| {
+            self.apply_b(forward);
             assert!(self.is_terminal() || self.values.len() == self.codomain.len());
             for (i, t) in self.codomain.iter().enumerate() {
                 t.0.borrow_mut().value = Some(self.values[i].clone());
