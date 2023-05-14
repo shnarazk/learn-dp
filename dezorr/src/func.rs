@@ -95,8 +95,10 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
             // let num_used = source_binding.codomain.len();
             // assert!(num_used < source_binding.values.len());
             let link = Connection::new(None, self, target);
-            source_binding.codomain.push(link.clone());
-            dist_binding.domain.push(link);
+            // source_binding.codomain.push(link.clone());
+            source_binding.add_output(link.clone());
+            // dist_binding.domain.push(link);
+            dist_binding.add_input(link);
         }
         {
             // backward bonding
@@ -105,8 +107,10 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
             // let num_used = source_binding.codomain.len();
             // assert!(num_used < source_binding.values.len());
             let link = Connection::new(None, target, self);
-            source_binding.codomain.push(link.clone());
-            dist_binding.domain.push(link);
+            // source_binding.codomain.push(link.clone());
+            source_binding.add_output(link.clone());
+            // dist_binding.domain.push(link);
+            dist_binding.add_input(link);
         }
     }
     /*
@@ -201,16 +205,9 @@ mod tests {
     #[test]
     fn test_step_2() {
         let c0: Function<usize> = Function::coterminal(vec![0usize]);
-        assert_eq!(c0.0.borrow().f.values, vec![0]);
-        println!("#1 passed");
         let f0: Function<usize> =
             Function::<usize>::new(Some(Box::new(|x: usize| x + 1)), Some(Box::new(|_| 1)));
         c0.link_to(&f0);
-        assert_eq!(c0.0.borrow().f.codomain.len(), 1);
-        c0.0.borrow().f.codomain[0].set_value(Some(10));
-        assert_eq!(f0.0.borrow().f.domain[0].get_value(), Some(10));
-        println!("#2 passed");
-        // c0.apply_f();
         c0.propagate_f();
         assert!(c0.0.borrow().f.is_applied());
         println!("#3 passed");

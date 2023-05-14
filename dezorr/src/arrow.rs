@@ -6,8 +6,8 @@ use {
 };
 
 #[derive(Clone)]
-pub struct ConnectionBody<'a, D: ContinuousDomain> {
-    pub value: Option<D>,
+struct ConnectionBody<'a, D: ContinuousDomain> {
+    value: Option<D>,
     source: &'a Function<'a, D>,
     target: &'a Function<'a, D>,
 }
@@ -42,10 +42,10 @@ impl<'a, D: ContinuousDomain> Connection<'a, D> {
 #[allow(clippy::complexity)]
 #[derive(Default)]
 pub struct Arrow<'a, D: ContinuousDomain> {
-    pub domain: Vec<Connection<'a, D>>,
-    pub arrow: Option<Rc<Box<dyn Fn(D) -> D>>>,
-    pub values: Vec<D>,
-    pub codomain: Vec<Connection<'a, D>>,
+    domain: Vec<Connection<'a, D>>,
+    arrow: Option<Rc<Box<dyn Fn(D) -> D>>>,
+    values: Vec<D>,
+    codomain: Vec<Connection<'a, D>>,
 }
 
 impl<D: ContinuousDomain> Clone for Arrow<'_, D> {
@@ -83,6 +83,9 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
     }
     pub fn add_input(&mut self, connection: Connection<'a, D>) {
         self.domain.push(connection);
+    }
+    pub fn add_output(&mut self, connection: Connection<'a, D>) {
+        self.codomain.push(connection);
     }
     fn inputs(&'a self) -> Vec<Option<D>> {
         self.domain
