@@ -1,6 +1,7 @@
 pub trait ContinuousDomain:
     'static
     + Clone
+    + std::fmt::Debug
     + Default
     + std::ops::Add<Output = Self>
     + std::ops::Sub<Output = Self>
