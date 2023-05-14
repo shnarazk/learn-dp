@@ -87,14 +87,14 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
     pub fn add_output(&mut self, connection: Connection<'a, D>) {
         self.codomain.push(connection);
     }
-    fn inputs(&'a self) -> Vec<Option<D>> {
+    pub fn inputs(&self) -> Vec<Option<D>> {
         self.domain
             .iter()
             .map(|l| l.0.borrow().value.clone())
-            .collect::<Vec<_>>()
+            .collect::<Vec<Option<D>>>()
     }
-    fn outputs(&'a self) -> &[D] {
-        &self.values
+    pub fn outputs(&self) -> Vec<D> {
+        self.values.to_vec()
     }
     pub fn apply(&mut self) {
         if let Some(f) = &self.arrow {
@@ -119,7 +119,6 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
             for (i, v) in self.values.iter().enumerate() {
                 self.codomain[i].0.borrow_mut().value = Some(v.clone());
             }
-            println!("propagated");
             self.codomain
                 .iter()
                 .map(|c| c.0.borrow().target)

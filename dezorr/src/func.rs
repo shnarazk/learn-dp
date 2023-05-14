@@ -9,6 +9,7 @@ use {
 };
 
 pub trait FunctionOn<'a, D: ContinuousDomain> {
+    fn on_f<T>(&self, f: impl Fn(&Arrow<'a, D>) -> T) -> T;
     fn new(arrow: Option<Box<dyn Fn(D) -> D>>, coarrow: Option<Box<dyn Fn(D) -> D>>) -> Self;
     fn coterminal(value: Vec<D>) -> Self;
     fn terminal(value: Vec<D>) -> Self;
@@ -77,6 +78,10 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
             f: Arrow::default(),
             b: Arrow::coterminal(values),
         }))
+    }
+    fn on_f<T>(&self, f: impl Fn(&Arrow<'a, D>) -> T) -> T {
+        let a = &self.0.borrow().f;
+        f(a)
     }
     // fn inputs(&self) -> Iter<&D> {
     //     self.0.borrow().f.domain.iter().map(|l| &l.value)
@@ -231,17 +236,17 @@ mod tests {
         let c0: Function<usize> = Function::coterminal(vec![0usize]);
         let f0: Function<usize> =
             Function::<usize>::new(Some(Box::new(|x: usize| x + 1)), Some(Box::new(|_| 1)));
+        let y0: Function<usize> = Function::<usize>::terminal(vec![1usize]);
         c0.link_to(&f0);
+        f0.link_to(&y0);
         c0.propagate_f();
-        assert!(c0.0.borrow().f.is_applied());
-        println!("#3 passed");
-        assert!(f0.0.borrow().f.is_applicable());
-        println!("#4 passed");
-        f0.0.borrow_mut().f.apply();
-        assert!(f0.0.borrow().f.is_applied());
-        println!("#5 passed");
-        // c0.propagate_value_to(&f0);
-        // assert_eq!(f0.0.borrow().output.data, Some(1));
+        assert!(c0.on_f(|a| a.is_applied()));
+        assert!(f0.on_f(|a| a.is_applicable()));
+        assert!(f0.on_f(|a| !a.is_applied()));
+        f0.propagate_f();
+        assert!(f0.on_f(|a| a.is_applied()));
+        assert_eq!(f0.on_f(|a| a.outputs()), vec![1]);
+        assert_eq!(y0.on_f(|a| a.inputs()), vec![Some(1)]);
 
         // let _v1: Variable<f32> = Variable::new(2.0f32);
         // let c1: Function<f64> = Function::constant(2.0f64);
