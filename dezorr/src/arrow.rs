@@ -1,70 +1,17 @@
-#![allow(dead_code)]
-
 use {
-    crate::{func::Function, types::ContinuousDomain},
-    std::{cell::RefCell, rc::Rc},
+    crate::{func::Function, types::ContinuousDomain, var::Variable},
+    std::rc::Rc,
 };
 
-#[macro_export]
-macro_rules! DFN {
-    ($f: expr) => {
-        Some(Box::new(|xs| {
-            xs.iter().map(|r| $f(r.clone())).collect::<Vec<_>>()
-        }))
-    };
-}
-
-#[macro_export]
-macro_rules! TFN {
-    ($f: expr) => {
-        Some(Box::new($f))
-    };
-}
-
 pub type ArrowType<D> = Box<dyn Fn(&[D]) -> Vec<D>>;
-
-#[derive(Clone)]
-struct ConnectionBody<'a, D: ContinuousDomain> {
-    value: Option<D>,
-    source: &'a Function<'a, D>,
-    target: &'a Function<'a, D>,
-}
-
-#[derive(Clone)]
-pub struct Connection<'a, D: ContinuousDomain>(Rc<RefCell<ConnectionBody<'a, D>>>);
-
-impl<'a, D: ContinuousDomain + std::fmt::Debug> std::fmt::Debug for Connection<'a, D> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let binding = self.0.borrow();
-        f.debug_struct("Connection")
-            .field("vaule", &binding.value)
-            .finish()
-    }
-}
-
-impl<'a, D: ContinuousDomain> Connection<'a, D> {
-    pub fn new(value: Option<D>, source: &'a Function<'a, D>, target: &'a Function<'a, D>) -> Self {
-        Connection(Rc::new(RefCell::new(ConnectionBody {
-            value,
-            source,
-            target,
-        })))
-    }
-    pub fn get_value(&self) -> Option<D> {
-        self.0.borrow().value.clone()
-    }
-    pub fn set_value(&self, val: Option<D>) {
-        self.0.borrow_mut().value = val;
-    }
-}
 
 #[allow(clippy::complexity)]
 #[derive(Default)]
 pub struct Arrow<'a, D: ContinuousDomain> {
-    domain: Vec<Connection<'a, D>>,
+    domain: Vec<Variable<'a, D>>,
     pub arrow: Option<Rc<ArrowType<D>>>,
     values: Vec<D>,
-    codomain: Vec<Connection<'a, D>>,
+    codomain: Vec<Variable<'a, D>>,
 }
 
 impl<D: ContinuousDomain> Clone for Arrow<'_, D> {
@@ -114,10 +61,10 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
     pub fn is_coterminal(&self) -> bool {
         self.arrow.is_none() && self.domain.is_empty() && !self.values.is_empty()
     }
-    pub fn add_input(&mut self, connection: Connection<'a, D>) {
+    pub fn add_input(&mut self, connection: Variable<'a, D>) {
         self.domain.push(connection);
     }
-    pub fn add_output(&mut self, connection: Connection<'a, D>) {
+    pub fn add_output(&mut self, connection: Variable<'a, D>) {
         self.codomain.push(connection);
     }
     pub fn inputs(&self) -> Vec<Option<D>> {
@@ -220,11 +167,11 @@ impl<'a, D: ContinuousDomain> Arrow<'a, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::func::*;
+    use crate::{func::*, DFN};
     #[test]
     fn test_connection_basic() {
         let f0: Function<f64> = Function::coterminal(vec![0.0f64]);
-        let c0 = Connection::new(Some(0.0f64), &f0, &f0);
+        let c0 = Variable::new(Some(0.0f64), &f0, &f0);
         let c1 = c0.clone();
         c0.set_value(Some(10.0));
         assert_eq!(c1.get_value(), Some(10.0));
@@ -237,13 +184,13 @@ mod tests {
         let mut _a3: Arrow<f64> = Arrow::new(DFN!(|x| x - 1.0));
         let f0: Function<f64> = Function::coterminal(vec![0.0f64]);
         let f1: Function<f64> = Function::terminal(vec![1.0f64]);
-        let c0 = Connection::new(Some(0.0f64), &f0, &f1);
+        let c0 = Variable::new(Some(0.0f64), &f0, &f1);
         a0.codomain.push(c0.clone());
         assert!(a0.is_coterminal());
         assert!(a0.is_applicable());
         assert!(a0.is_applied());
         assert!(a1.is_terminal());
         a1.add_input(c0);
-        // let _c = Connection::new(0.0f64, &c0);
+        // let _c = Variable::new(0.0f64, &c0);
     }
 }

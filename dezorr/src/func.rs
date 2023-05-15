@@ -2,8 +2,9 @@
 
 use {
     crate::{
-        arrow::{Arrow, ArrowType, Connection},
+        arrow::{Arrow, ArrowType},
         types::ContinuousDomain,
+        var::Variable,
         DFN,
     },
     std::{cell::RefCell, collections::VecDeque},
@@ -30,6 +31,8 @@ pub trait FunctionOn<'a, D: ContinuousDomain> {
     fn coterminal(value: Vec<D>) -> Self;
     fn terminal(value: Vec<D>) -> Self;
     fn is_coterminal(&'a self) -> bool;
+    fn add_input(&'a self, var: &Variable<'a, D>);
+    fn add_output(&'a self, var: &Variable<'a, D>);
     fn link_to(&'a self, other: &'a Self);
     fn propagate_forward(&'a self);
     fn propagate_backward(&'a self);
@@ -101,13 +104,27 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
         let f = &binding.f;
         f.is_coterminal()
     }
+    fn add_input(&'a self, var: &Variable<'a, D>) {
+        {
+            let binding = &mut self.0.borrow_mut().f;
+            binding.add_input(var.clone());
+        }
+    }
+    fn add_output(&'a self, var: &Variable<'a, D>) {
+        {
+            let binding = &mut self.0.borrow_mut().f;
+            binding.add_output(var.clone());
+        }
+    }
     fn link_to(&'a self, target: &'a Self) {
         {
             // forward bonding
             let source_binding = &mut self.0.borrow_mut().f;
             let dist_binding = &mut target.0.borrow_mut().f;
-            // assert!(source_binding.codomain.len()< source_binding.values.len());
-            let link = Connection::new(None, self, target);
+            let link = Variable::new(None, self, target);
+            // self.add_output(&link);
+            // target.add_input(&link);
+            // // assert!(source_binding.codomain.len()< source_binding.values.len());
             source_binding.add_output(link.clone());
             dist_binding.add_input(link);
         }
@@ -115,7 +132,9 @@ impl<'a, D: ContinuousDomain> FunctionOn<'a, D> for Function<'a, D> {
             // backward bonding
             let source_binding = &mut target.0.borrow_mut().b;
             let dist_binding = &mut self.0.borrow_mut().b;
-            let link = Connection::new(None, target, self);
+            let link = Variable::new(None, target, self);
+            // target.add_output(&link);
+            // self.add_input(&link);
             source_binding.add_output(link.clone());
             dist_binding.add_input(link);
         }
